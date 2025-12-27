@@ -1,8 +1,3 @@
----
-title: Execution Strategies
-description: Different strategies for executing operation sequences.
----
-
 Different strategies for executing operation sequences.
 
 ## Sequential Strategy

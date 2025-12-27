@@ -1,8 +1,3 @@
----
-title: Execution Guards
-description: Control operation execution with guards and conditions.
----
-
 Control operation execution with guards and conditions.
 
 ## Basic Guards

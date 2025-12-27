@@ -1,8 +1,3 @@
----
-title: Getting Started
-description: Install and start using Sequencer for operation execution in PHP.
----
-
 Sequencer provides a flexible framework for executing sequences of operations with various execution strategies, guards, and error handling.
 
 ## Installation
