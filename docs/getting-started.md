@@ -78,5 +78,5 @@ try {
 
 ## Next Steps
 
-- [Execution Strategies](/sequencer/execution-strategies/) - Different execution patterns
-- [Execution Guards](/sequencer/execution-guards/) - Conditional execution
+- [Execution Strategies](./execution-strategies.md) - Different execution patterns
+- [Execution Guards](./execution-guards.md) - Conditional execution
