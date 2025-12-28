@@ -10,6 +10,8 @@
 use Cline\Sequencer\Database\Models\Operation;
 use Cline\Sequencer\Database\Models\OperationError;
 use Cline\Sequencer\Enums\OperationState;
+use Cline\VariableKeys\Enums\PrimaryKeyType;
+use Cline\VariableKeys\Facades\VariableKeys;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -152,6 +154,11 @@ test('primary key behavior with auto increment configuration', function (): void
 test('primary key behavior with uuid configuration', function (): void {
     // Arrange
     Config::set('sequencer.primary_key_type', 'uuid');
+    VariableKeys::map([
+        Operation::class => [
+            'primary_key_type' => PrimaryKeyType::UUID,
+        ],
+    ]);
     $operation = new Operation();
 
     // Act
@@ -167,6 +174,11 @@ test('primary key behavior with uuid configuration', function (): void {
 test('primary key behavior with ulid configuration', function (): void {
     // Arrange
     Config::set('sequencer.primary_key_type', 'ulid');
+    VariableKeys::map([
+        Operation::class => [
+            'primary_key_type' => PrimaryKeyType::ULID,
+        ],
+    ]);
     $operation = new Operation();
 
     // Act

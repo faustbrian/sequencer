@@ -19,13 +19,14 @@ use Cline\Sequencer\Commands\StatusCommand;
 use Cline\Sequencer\Contracts\ExecutionStrategy as ExecutionStrategyContract;
 use Cline\Sequencer\Contracts\Orchestrator;
 use Cline\Sequencer\Database\Models\Operation;
+use Cline\Sequencer\Database\Models\OperationError;
 use Cline\Sequencer\Enums\ExecutionStrategy;
 use Cline\Sequencer\Observers\SequencerObserver;
 use Cline\Sequencer\Strategies\CommandStrategy;
 use Cline\Sequencer\Strategies\MigrationStrategy;
 use Cline\Sequencer\Support\GuardManager;
-use Cline\VariableKeys\Facades\VariableKeys;
 use Cline\VariableKeys\Enums\PrimaryKeyType;
+use Cline\VariableKeys\Facades\VariableKeys;
 use Illuminate\Contracts\Foundation\Application;
 use Override;
 use Spatie\LaravelPackageTools\Package;
@@ -161,6 +162,9 @@ final class SequencerServiceProvider extends PackageServiceProvider
     {
         VariableKeys::map([
             Operation::class => [
+                'primary_key_type' => PrimaryKeyType::from(config('sequencer.primary_key_type', 'id')),
+            ],
+            OperationError::class => [
                 'primary_key_type' => PrimaryKeyType::from(config('sequencer.primary_key_type', 'id')),
             ],
         ]);

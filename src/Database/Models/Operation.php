@@ -10,8 +10,8 @@
 namespace Cline\Sequencer\Database\Models;
 
 use Cline\Sequencer\Database\Builders\OperationBuilder;
-use Cline\VariableKeys\Database\Concerns\HasVariablePrimaryKey;
 use Cline\Sequencer\Enums\OperationState;
+use Cline\VariableKeys\Database\Concerns\HasVariablePrimaryKey;
 use Database\Factories\Cline\Sequencer\Database\Models\OperationFactory;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Collection;
