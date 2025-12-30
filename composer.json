@@ -13,13 +13,13 @@
     ],
     "require": {
         "php": "^8.5.0",
-        "spatie/laravel-package-tools": "^1.92.7",
-        "cline/variable-keys": "^1.1"
+        "cline/variable-keys": "^1.2",
+        "spatie/laravel-package-tools": "^1.92.7"
     },
     "require-dev": {
-        "cline/coding-standard": "^1.5.7",
-        "laravel/pulse": "^1.4.5",
-        "laravel/telescope": "^5.15.1",
+        "cline/coding-standard": "^1.6.3",
+        "laravel/pulse": "^1.4.7",
+        "laravel/telescope": "^5.16.0",
         "orchestra/testbench": "^10.8",
         "symfony/var-dumper": "^7.4.0",
         "timokoerber/laravel-one-time-operations": "^1.4.5"
