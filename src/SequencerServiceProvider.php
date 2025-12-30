@@ -160,12 +160,15 @@ final class SequencerServiceProvider extends PackageServiceProvider
      */
     private function registerVariableKeys(): void
     {
+        /** @var string $primaryKeyType */
+        $primaryKeyType = config('sequencer.primary_key_type', 'id');
+
         VariableKeys::map([
             Operation::class => [
-                'primary_key_type' => PrimaryKeyType::from(config('sequencer.primary_key_type', 'id')),
+                'primary_key_type' => PrimaryKeyType::from($primaryKeyType),
             ],
             OperationError::class => [
-                'primary_key_type' => PrimaryKeyType::from(config('sequencer.primary_key_type', 'id')),
+                'primary_key_type' => PrimaryKeyType::from($primaryKeyType),
             ],
         ]);
     }
