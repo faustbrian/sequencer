@@ -510,7 +510,7 @@ describe('MakeOperationCommand', function (): void {
             Artisan::call('make:operation', ['name' => 'OperationÄÖÜ']);
 
             // Assert
-            $expectedPath = database_path('operations/2024_07_03_100000_operationäöü.php');
+            $expectedPath = database_path('operations/2024_07_03_100000_operationÄÖÜ.php');
             expect(File::exists($expectedPath))->toBeTrue();
         })->group('edge-case', 'multibyte');
     });
