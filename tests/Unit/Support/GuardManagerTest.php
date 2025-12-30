@@ -208,6 +208,22 @@ describe('GuardManager', function (): void {
             expect($this->manager->isAllowed())->toBeTrue();
         })->group('happy-path');
 
+        test('returns true when multiple guards all pass', function (): void {
+            Config::set('sequencer.guards', [
+                [
+                    'driver' => HostnameGuard::class,
+                    'config' => [], // Empty = allow all
+                ],
+                [
+                    'driver' => IpAddressGuard::class,
+                    'config' => [], // Empty = allow all
+                ],
+            ]);
+            $this->manager->clearCache();
+
+            expect($this->manager->isAllowed())->toBeTrue();
+        })->group('happy-path');
+
         test('returns false when any guard blocks', function (): void {
             Config::set('sequencer.guards', [
                 [
@@ -215,6 +231,47 @@ describe('GuardManager', function (): void {
                     'config' => [
                         'allowed' => ['allowed-server'],
                         'current_hostname' => 'blocked-server',
+                    ],
+                ],
+            ]);
+            $this->manager->clearCache();
+
+            expect($this->manager->isAllowed())->toBeFalse();
+        })->group('sad-path');
+
+        test('returns false when second guard blocks in multiple guards', function (): void {
+            Config::set('sequencer.guards', [
+                [
+                    'driver' => HostnameGuard::class,
+                    'config' => [], // Allow all
+                ],
+                [
+                    'driver' => IpAddressGuard::class,
+                    'config' => [
+                        'allowed' => ['192.168.1.1'],
+                        'current_ip' => '10.0.0.1',
+                    ],
+                ],
+            ]);
+            $this->manager->clearCache();
+
+            expect($this->manager->isAllowed())->toBeFalse();
+        })->group('sad-path');
+
+        test('returns false when multiple guards block', function (): void {
+            Config::set('sequencer.guards', [
+                [
+                    'driver' => HostnameGuard::class,
+                    'config' => [
+                        'allowed' => ['allowed-server'],
+                        'current_hostname' => 'blocked-server',
+                    ],
+                ],
+                [
+                    'driver' => IpAddressGuard::class,
+                    'config' => [
+                        'allowed' => ['192.168.1.1'],
+                        'current_ip' => '10.0.0.1',
                     ],
                 ],
             ]);

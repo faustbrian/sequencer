@@ -211,6 +211,31 @@ describe('OperationBuilder Query Scopes', function (): void {
             // Assert
             expect($operations->first()->id)->toBe($later->id);
         })->group('happy-path');
+
+        test('ignores column parameter and always orders by executed_at', function (): void {
+            // Arrange
+            $later = Operation::factory()->create(['executed_at' => Date::now()]);
+            $earlier = Operation::factory()->create(['executed_at' => Date::now()->subHour()]);
+
+            // Act - Pass 'created_at' column which should be ignored
+            $operations = Operation::query()->latest('created_at')->get();
+
+            // Assert - Should still order by executed_at, not created_at
+            expect($operations->first()->id)->toBe($later->id);
+            expect($operations->last()->id)->toBe($earlier->id);
+        })->group('happy-path');
+
+        test('overrides default Eloquent behavior', function (): void {
+            // Arrange
+            $later = Operation::factory()->create(['executed_at' => Date::now()]);
+            $earlier = Operation::factory()->create(['executed_at' => Date::now()->subHour()]);
+
+            // Act - Call with null parameter (default behavior)
+            $operations = Operation::query()->latest()->get();
+
+            // Assert - Should order by executed_at instead of created_at
+            expect($operations->first()->id)->toBe($later->id);
+        })->group('happy-path');
     });
 
     describe('oldest() scope', function (): void {
@@ -223,6 +248,31 @@ describe('OperationBuilder Query Scopes', function (): void {
             $operations = Operation::query()->oldest()->get();
 
             // Assert
+            expect($operations->first()->id)->toBe($earlier->id);
+        })->group('happy-path');
+
+        test('ignores column parameter and always orders by executed_at', function (): void {
+            // Arrange
+            $later = Operation::factory()->create(['executed_at' => Date::now()]);
+            $earlier = Operation::factory()->create(['executed_at' => Date::now()->subHour()]);
+
+            // Act - Pass 'created_at' column which should be ignored
+            $operations = Operation::query()->oldest('created_at')->get();
+
+            // Assert - Should still order by executed_at, not created_at
+            expect($operations->first()->id)->toBe($earlier->id);
+            expect($operations->last()->id)->toBe($later->id);
+        })->group('happy-path');
+
+        test('overrides default Eloquent behavior', function (): void {
+            // Arrange
+            $later = Operation::factory()->create(['executed_at' => Date::now()]);
+            $earlier = Operation::factory()->create(['executed_at' => Date::now()->subHour()]);
+
+            // Act - Call with null parameter (default behavior)
+            $operations = Operation::query()->oldest()->get();
+
+            // Assert - Should order by executed_at instead of created_at
             expect($operations->first()->id)->toBe($earlier->id);
         })->group('happy-path');
     });
@@ -387,5 +437,129 @@ describe('OperationBuilder Query Scopes', function (): void {
             expect($successful)->toHaveCount(1)
                 ->and($successful->first()->rolled_back_at)->toBeNull();
         })->group('happy-path');
+    });
+
+    describe('Method Chaining and Edge Cases', function (): void {
+        test('chains multiple scopes together', function (): void {
+            // Arrange
+            Operation::factory()->create([
+                'name' => 'TestOperation',
+                'type' => 'sync',
+                'completed_at' => Date::now(),
+                'executed_at' => Date::now(),
+                'state' => OperationState::Completed,
+            ]);
+            Operation::factory()->create([
+                'name' => 'TestOperation',
+                'type' => 'async',
+                'completed_at' => Date::now(),
+                'executed_at' => Date::now()->addSecond(),
+                'state' => OperationState::Completed,
+            ]);
+            Operation::factory()->create([
+                'name' => 'OtherOperation',
+                'type' => 'sync',
+                'completed_at' => Date::now(),
+                'executed_at' => Date::now()->addSeconds(2),
+                'state' => OperationState::Completed,
+            ]);
+
+            // Act
+            $operations = Operation::query()
+                ->named('TestOperation')
+                ->synchronous()
+                ->completed()
+                ->latest()
+                ->get();
+
+            // Assert
+            expect($operations)->toHaveCount(1);
+        })->group('edge-case');
+
+        test('latest() works after other scopes', function (): void {
+            // Arrange
+            $later = Operation::factory()->create([
+                'type' => 'sync',
+                'executed_at' => Date::now(),
+                'completed_at' => Date::now(),
+                'state' => OperationState::Completed,
+            ]);
+            $earlier = Operation::factory()->create([
+                'type' => 'sync',
+                'executed_at' => Date::now()->subHour(),
+                'completed_at' => Date::now()->subHour(),
+                'state' => OperationState::Completed,
+            ]);
+            Operation::factory()->create([
+                'type' => 'async',
+                'executed_at' => Date::now(),
+                'state' => OperationState::Pending,
+            ]);
+
+            // Act
+            $operations = Operation::query()
+                ->synchronous()
+                ->completed()
+                ->latest()
+                ->get();
+
+            // Assert
+            expect($operations)->toHaveCount(2);
+            expect($operations->first()->id)->toBe($later->id);
+        })->group('edge-case');
+
+        test('oldest() works after other scopes', function (): void {
+            // Arrange
+            $later = Operation::factory()->create([
+                'type' => 'async',
+                'executed_at' => Date::now(),
+                'state' => OperationState::Pending,
+            ]);
+            $earlier = Operation::factory()->create([
+                'type' => 'async',
+                'executed_at' => Date::now()->subHour(),
+                'state' => OperationState::Pending,
+            ]);
+
+            // Act
+            $operations = Operation::query()
+                ->asynchronous()
+                ->oldest()
+                ->get();
+
+            // Assert
+            expect($operations)->toHaveCount(2);
+            expect($operations->first()->id)->toBe($earlier->id);
+        })->group('edge-case');
+
+        test('handles empty result sets', function (): void {
+            // Arrange
+            Operation::factory()->create([
+                'type' => 'sync',
+                'state' => OperationState::Completed,
+            ]);
+
+            // Act
+            $operations = Operation::query()
+                ->asynchronous()
+                ->latest()
+                ->get();
+
+            // Assert
+            expect($operations)->toHaveCount(0);
+        })->group('edge-case');
+
+        test('orderedByExecution defaults to ascending', function (): void {
+            // Arrange
+            $later = Operation::factory()->create(['executed_at' => Date::now()]);
+            $earlier = Operation::factory()->create(['executed_at' => Date::now()->subHour()]);
+
+            // Act - Call without direction parameter
+            $operations = Operation::orderedByExecution()->get();
+
+            // Assert
+            expect($operations->first()->id)->toBe($earlier->id);
+            expect($operations->last()->id)->toBe($later->id);
+        })->group('edge-case');
     });
 });
