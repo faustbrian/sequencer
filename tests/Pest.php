@@ -6,6 +6,7 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
+
 use Cline\Sequencer\Contracts\Operation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\File;
@@ -45,9 +46,9 @@ $GLOBALS['test_operations'] ??= [];
  * This is needed because ExecuteOperation now accepts operation file paths
  * instead of operation objects, to support serialization of anonymous class operations.
  *
- * @param Operation $operation The operation instance to wrap in a file
- * @param  null|string                         $name      Optional custom file name
- * @return string                              The absolute path to the created operation file
+ * @param  Operation   $operation The operation instance to wrap in a file
+ * @param  null|string $name      Optional custom file name
+ * @return string      The absolute path to the created operation file
  */
 function wrapOperationInFile(Operation $operation, ?string $name = null): string
 {
@@ -58,7 +59,7 @@ function wrapOperationInFile(Operation $operation, ?string $name = null): string
     $GLOBALS['test_operations'][$operationId] = $operation;
 
     $fileName = $name ?? sprintf('test_operation_%s.php', $counter);
-    $filePath = database_path('operations/' . $fileName);
+    $filePath = database_path('operations/'.$fileName);
 
     if (!is_dir(database_path('operations'))) {
         mkdir(database_path('operations'), 0o755, true);

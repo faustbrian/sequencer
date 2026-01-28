@@ -124,7 +124,7 @@ final class SequencerServiceProvider extends PackageServiceProvider
         $this->app->singleton(MigrationStrategy::class);
 
         // Bind interface to configured strategy
-        $this->app->singleton(function (Application $app): ExecutionStrategyContract {
+        $this->app->singleton(ExecutionStrategyContract::class, function (Application $app): ExecutionStrategyContract {
             /** @var string $strategyValue */
             $strategyValue = config('sequencer.strategy', ExecutionStrategy::Command->value);
 

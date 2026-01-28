@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\File;
 
 beforeEach(function (): void {
     $this->tempDir = sys_get_temp_dir().'/sequencer_state_transitions_'.uniqid();
-    File::makeDirectory($this->tempDir, 0755, true);
+    File::makeDirectory($this->tempDir, 0o755, true);
     config(['sequencer.execution.discovery_paths' => [$this->tempDir]]);
 });
 
@@ -32,7 +32,7 @@ describe('State Transition Timestamp Management', function (): void {
 
         $op = <<<PHP
 <?php
-use Cline\Sequencer\Contracts\Operation;
+use Cline\\Sequencer\\Contracts\\Operation;
 
 return new class() implements Operation {
     public function handle(): void {
@@ -42,7 +42,7 @@ return new class() implements Operation {
         file_put_contents(\$counterFile, (string) \$count);
 
         if (\$count === 1) {
-            throw new \RuntimeException('First run fails');
+            throw new \\RuntimeException('First run fails');
         }
         // Second run succeeds
     }
@@ -57,7 +57,7 @@ PHP;
         try {
             $sequencer->execute('2024_01_01_000000_retry_test.php');
             $this->fail('Expected operation to fail on first run');
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             // Expected
         }
 
@@ -93,7 +93,7 @@ PHP;
 
         $op = <<<PHP
 <?php
-use Cline\Sequencer\Contracts\Operation;
+use Cline\\Sequencer\\Contracts\\Operation;
 
 return new class() implements Operation {
     public function handle(): void {
@@ -103,7 +103,7 @@ return new class() implements Operation {
         file_put_contents(\$counterFile, (string) \$count);
 
         if (\$count === 2) {
-            throw new \RuntimeException('Second run fails');
+            throw new \\RuntimeException('Second run fails');
         }
         // First run succeeds
     }
@@ -127,10 +127,11 @@ PHP;
 
         // Act: Re-run execution - should fail (wait 1 second to avoid unique constraint)
         $this->travel(1)->second();
+
         try {
             $sequencer->execute('2024_01_01_000000_rerun_test.php');
             $this->fail('Expected operation to fail on re-run');
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             // Expected
         }
 
@@ -154,7 +155,7 @@ PHP;
 
         $op = <<<PHP
 <?php
-use Cline\Sequencer\Contracts\Operation;
+use Cline\\Sequencer\\Contracts\\Operation;
 
 return new class() implements Operation {
     public function handle(): void {
@@ -165,7 +166,7 @@ return new class() implements Operation {
 
         // Fail on odd runs, succeed on even runs
         if (\$count % 2 === 1) {
-            throw new \RuntimeException('Odd run fails');
+            throw new \\RuntimeException('Odd run fails');
         }
     }
 };
@@ -179,7 +180,7 @@ PHP;
         try {
             $sequencer->execute('2024_01_01_000000_cycle_test.php');
             $this->fail('Expected first run to fail');
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             // Expected
         }
 
@@ -199,10 +200,11 @@ PHP;
 
         // Cycle 3: Fail again
         $this->travel(1)->second();
+
         try {
             $sequencer->execute('2024_01_01_000000_cycle_test.php');
             $this->fail('Expected third run to fail');
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             // Expected
         }
 
@@ -229,8 +231,8 @@ PHP;
 
         $op = <<<PHP
 <?php
-use Cline\Sequencer\Contracts\Operation;
-use Cline\Sequencer\Exceptions\OperationSkippedException;
+use Cline\\Sequencer\\Contracts\\Operation;
+use Cline\\Sequencer\\Exceptions\\OperationSkippedException;
 
 return new class() implements Operation {
     public function handle(): void {
@@ -286,8 +288,8 @@ PHP;
 
         $op = <<<PHP
 <?php
-use Cline\Sequencer\Contracts\Asynchronous;
-use Cline\Sequencer\Contracts\Operation;
+use Cline\\Sequencer\\Contracts\\Asynchronous;
+use Cline\\Sequencer\\Contracts\\Operation;
 
 return new class() implements Operation, Asynchronous {
     public function handle(): void {
@@ -297,7 +299,7 @@ return new class() implements Operation, Asynchronous {
         file_put_contents(\$counterFile, (string) \$count);
 
         if (\$count === 1) {
-            throw new \RuntimeException('First async run fails');
+            throw new \\RuntimeException('First async run fails');
         }
         // Second run succeeds
     }
@@ -312,7 +314,7 @@ PHP;
         try {
             $sequencer->executeSync('2024_01_01_000000_async_retry.php');
             $this->fail('Expected operation to fail on first run');
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             // Expected
         }
 

@@ -21,6 +21,7 @@ use Throwable;
 use function is_string;
 use function property_exists;
 use function sprintf;
+use function str_ends_with;
 use function throw_if;
 use function throw_unless;
 
@@ -160,6 +161,7 @@ final class OneTimeOperationsMigrator implements Migrator
         throw_unless(property_exists($operation, 'processed_at'), MissingOperationFieldException::forField('processed_at'));
 
         $operationName = $operation->name;
+
         // Append .php extension if not present (one_time_operations stores without extension)
         if (!str_ends_with($operationName, '.php')) {
             $operationName .= '.php';

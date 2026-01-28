@@ -1,4 +1,5 @@
 <?php declare(strict_types=1);
+
 /**
  * Copyright (C) Brian Faust
  *
@@ -9,8 +10,11 @@
 use Cline\Sequencer\Database\Models\Operation as OperationModel;
 use Cline\Sequencer\Enums\OperationState;
 use Cline\Sequencer\Jobs\ExecuteOperation;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Tests\Fixtures\Operations\AsyncOperation;
+
+
 
 test('anonymous class operation can be serialized and queued', function (): void {
     // Create an anonymous class operation
@@ -489,11 +493,11 @@ PHP
 
         // Dispatch to queue
         dispatch(
-            new ExecuteOperation($operationFile, $record->id)
+            new ExecuteOperation($operationFile, $record->id),
         );
 
         // Verify job was pushed to queue
-        Queue::assertPushed(ExecuteOperation::class, fn($job): bool => $job->uniqueId() === (string) $record->id);
+        Queue::assertPushed(ExecuteOperation::class, fn ($job): bool => $job->uniqueId() === (string) $record->id);
     } finally {
         if (file_exists($operationFile)) {
             unlink($operationFile);
@@ -645,7 +649,7 @@ PHP
         $autoTransaction = config('sequencer.execution.auto_transaction', true);
 
         if ($autoTransaction) {
-            \Illuminate\Support\Facades\DB::transaction(fn () => $operation->handle());
+            DB::transaction(fn () => $operation->handle());
         } else {
             $operation->handle();
         }
@@ -705,7 +709,7 @@ PHP
 
         try {
             $operation->handle();
-        } catch (\Throwable $throwable) {
+        } catch (Throwable $throwable) {
             $record->update([
                 'failed_at' => now(),
                 'state' => OperationState::Failed,
