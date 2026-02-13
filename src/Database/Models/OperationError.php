@@ -110,20 +110,12 @@ final class OperationError extends Model
     }
 
     /**
-     * Get the attribute casting configuration.
+     * Attribute casting configuration.
      *
-     * Configures automatic casting for the context array and created_at timestamp,
-     * enabling convenient access to structured error context and datetime manipulation.
-     * The context field is automatically serialized/unserialized as JSON when stored
-     * in the database.
-     *
-     * @return array<string, string> Attribute casting map
+     * @var array<string, string>
      */
-    protected function casts(): array
-    {
-        return [
-            'context' => 'array',
-            'created_at' => 'datetime',
-        ];
-    }
+    protected $casts = [
+        'context' => 'array',
+        'created_at' => 'datetime',
+    ];
 }

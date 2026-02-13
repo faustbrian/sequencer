@@ -131,24 +131,16 @@ final class Operation extends Model
     }
 
     /**
-     * Get the attribute casting configuration.
+     * Attribute casting configuration.
      *
-     * Configures automatic casting of timestamp columns to Carbon instances for
-     * convenient date/time manipulation and formatting throughout the application.
-     * Also casts the state field to the OperationState enum for type-safe state
-     * checking and transitions.
-     *
-     * @return array<string, string> Attribute casting map
+     * @var array<string, string>
      */
-    protected function casts(): array
-    {
-        return [
-            'executed_at' => 'datetime',
-            'completed_at' => 'datetime',
-            'failed_at' => 'datetime',
-            'skipped_at' => 'datetime',
-            'rolled_back_at' => 'datetime',
-            'state' => OperationState::class,
-        ];
-    }
+    protected $casts = [
+        'executed_at' => 'datetime',
+        'completed_at' => 'datetime',
+        'failed_at' => 'datetime',
+        'skipped_at' => 'datetime',
+        'rolled_back_at' => 'datetime',
+        'state' => OperationState::class,
+    ];
 }
