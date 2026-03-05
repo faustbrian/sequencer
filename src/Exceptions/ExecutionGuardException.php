@@ -10,6 +10,9 @@
 namespace Cline\Sequencer\Exceptions;
 
 use Cline\Sequencer\Contracts\ExecutionGuard;
+use Facade\IgnitionContracts\BaseSolution;
+use Facade\IgnitionContracts\ProvidesSolution;
+use Facade\IgnitionContracts\Solution;
 use RuntimeException;
 
 /**
@@ -21,7 +24,7 @@ use RuntimeException;
  *
  * @author Brian Faust <brian@cline.sh>
  */
-final class ExecutionGuardException extends RuntimeException implements SequencerException
+final class ExecutionGuardException extends RuntimeException implements ProvidesSolution, SequencerException
 {
     /**
      * Create a new execution guard exception.
@@ -48,5 +51,17 @@ final class ExecutionGuardException extends RuntimeException implements Sequence
     public function getGuardName(): string
     {
         return $this->guard->name();
+    }
+
+    public function getSolution(): Solution
+    {
+        /** @var BaseSolution $solution */
+        $solution = BaseSolution::create('Review package usage and configuration.');
+
+        return $solution
+            ->setSolutionDescription('Exception: '.$this->getMessage())
+            ->setDocumentationLinks([
+                'Package documentation' => 'https://github.com/cline/sequencer',
+            ]);
     }
 }
