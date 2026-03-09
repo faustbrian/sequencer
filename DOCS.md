@@ -1,10 +1,10 @@
 ## Table of Contents
 
-1. [Getting Started](#doc-docs-readme) (`docs/README.md`)
-2. [Execution Guards](#doc-cookbooks-execution-guards) (`cookbooks/execution-guards.php`)
-3. [Execution Strategies](#doc-cookbooks-execution-strategies) (`cookbooks/execution-strategies.php`)
-4. [Execution Guards](#doc-docs-execution-guards) (`docs/execution-guards.md`)
-5. [Execution Strategies](#doc-docs-execution-strategies) (`docs/execution-strategies.md`)
+1. [Getting Started](#doc-docs-readme)
+2. [Execution Guards](#doc-cookbooks-execution-guards)
+3. [Execution Strategies](#doc-cookbooks-execution-strategies)
+4. [Execution Guards](#doc-docs-execution-guards)
+5. [Execution Strategies](#doc-docs-execution-strategies)
 <a id="doc-docs-readme"></a>
 
 Sequencer provides a flexible framework for executing sequences of operations with various execution strategies, guards, and error handling.
