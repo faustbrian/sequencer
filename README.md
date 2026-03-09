@@ -19,22 +19,22 @@ composer require cline/sequencer
 
 ## Quick Start
 
-Create an operation, implement the `handle()` method, and execute sequentially with `php artisan sequencer:process`. See [Getting Started](cookbook/getting-started.md) for detailed examples.
+Create an operation, implement the `handle()` method, and execute sequentially with `php artisan sequencer:process`. See [Getting Started](DOCS.md#doc-docs-readme) for detailed examples.
 
 ## Documentation
 
-- **[Getting Started](cookbook/getting-started.md)** - Installation, configuration, and first operation
-- **[Basic Usage](cookbook/basic-usage.md)** - Core operations and sequential execution
-- **[Monitoring & Status](cookbook/monitoring-status.md)** - Check pending, completed, and failed operations
-- **[Orchestration Strategies](cookbook/orchestration-strategies.md)** - Sequential, batch, transactional, dependency-based, and scheduled execution
-- **[Advanced Operations](cookbook/advanced-operations.md)** - Retries, timeouts, batching, chaining, middleware, unique operations, encryption, tags, lifecycle hooks
-- **[Programmatic Usage](cookbook/programmatic-usage.md)** - Facade API, conditional execution, status checks, error handling
-- **[Events](cookbook/events.md)** - Operation lifecycle events for logging, monitoring, and custom workflows
-- **[Rollback Support](cookbook/rollback-support.md)** - Automatic rollback on failures
-- **[Dependencies](cookbook/dependencies.md)** - Explicit operation ordering
-- **[Conditional Execution](cookbook/conditional-execution.md)** - Runtime execution conditions
-- **[Skip Operations](cookbook/skip-operations.md)** - Skip operations at runtime with SkipOperationException
-- **[Advanced Usage](cookbook/advanced-usage.md)** - Transactions, async operations, observability
+- **[Getting Started](DOCS.md#doc-docs-readme)** - Installation, configuration, and first operation
+- **[Basic Usage](DOCS.md#doc-docs-readme)** - Core operations and sequential execution
+- **[Monitoring & Status](DOCS.md)** - Check pending, completed, and failed operations
+- **[Orchestration Strategies](DOCS.md)** - Sequential, batch, transactional, dependency-based, and scheduled execution
+- **[Advanced Operations](DOCS.md)** - Retries, timeouts, batching, chaining, middleware, unique operations, encryption, tags, lifecycle hooks
+- **[Programmatic Usage](DOCS.md)** - Facade API, conditional execution, status checks, error handling
+- **[Events](DOCS.md)** - Operation lifecycle events for logging, monitoring, and custom workflows
+- **[Rollback Support](DOCS.md)** - Automatic rollback on failures
+- **[Dependencies](DOCS.md)** - Explicit operation ordering
+- **[Conditional Execution](DOCS.md)** - Runtime execution conditions
+- **[Skip Operations](DOCS.md)** - Skip operations at runtime with SkipOperationException
+- **[Advanced Usage](DOCS.md)** - Transactions, async operations, observability
 
 ## Key Features
 
