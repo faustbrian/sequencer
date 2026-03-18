@@ -22,7 +22,7 @@
         "laravel/pulse": "^1.6.0",
         "laravel/telescope": "^5.18.0",
         "orchestra/testbench": "^10.9",
-        "symfony/var-dumper": "^7.4.6",
+        "symfony/var-dumper": "^7.4.6 || ^8.0",
         "timokoerber/laravel-one-time-operations": "^1.4.5"
     },
     "minimum-stability": "stable",
