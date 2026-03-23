@@ -7,6 +7,7 @@
  * file that was distributed with this source code.
  */
 
+use Cline\Sequencer\Database\Models\DeferredOperation;
 use Cline\Sequencer\Enums\DeferredOperationStatus;
 use Cline\Sequencer\SequencerManager;
 use Cline\Sequencer\Support\DeferredOperationProcessor;
@@ -56,6 +57,29 @@ describe('Deferred Operations', function (): void {
                 'locale' => 'fi',
             ])
             ->and($record->due_at?->format('Y-m-d H:i:s'))->toBe($dueAt->format('Y-m-d H:i:s'));
+    });
+
+    test('it skips deferred operations that are not due yet', function (): void {
+        $record = resolve(SequencerManager::class)->defer(
+            operation: 'help_new_organization_email',
+            payload: ['business_entity_id' => 123],
+            dueAt: Date::now()->addMinute(),
+        );
+
+        $stats = resolve(DeferredOperationProcessor::class)->processDue();
+        $record->refresh();
+
+        expect($stats)->toBe([
+            'processed' => 0,
+            'completed' => 0,
+            'failed' => 0,
+            'retried' => 0,
+        ])
+            ->and($record->status)->toBe(DeferredOperationStatus::Pending)
+            ->and($record->attempts)->toBe(0)
+            ->and($record->reserved_at)->toBeNull()
+            ->and($record->processed_at)->toBeNull()
+            ->and(HelpNewOrganizationEmailOperation::$executed)->toBeFalse();
     });
 
     test('it executes due deferred operations from processor', function (): void {
@@ -140,7 +164,7 @@ describe('Deferred Operations', function (): void {
     });
 
     test('it retries failed deferred operations and marks them failed after max attempts', function (): void {
-        resolve(SequencerManager::class)->defer(
+        $record = resolve(SequencerManager::class)->defer(
             operation: 'failing_operation',
             payload: ['id' => 1],
             dueAt: Date::now()->subMinute(),
@@ -148,10 +172,68 @@ describe('Deferred Operations', function (): void {
         );
 
         $firstRun = resolve(DeferredOperationProcessor::class)->processDue();
+        $record->refresh();
         $secondRun = resolve(DeferredOperationProcessor::class)->processDue();
+        $record->refresh();
 
         expect($firstRun['retried'])->toBe(1)
             ->and($secondRun['failed'])->toBe(1)
-            ->and(FailingDeferredOperation::$attempts)->toBe(2);
+            ->and(FailingDeferredOperation::$attempts)->toBe(2)
+            ->and($record->status)->toBe(DeferredOperationStatus::Failed)
+            ->and($record->attempts)->toBe(2)
+            ->and($record->reserved_at)->toBeNull()
+            ->and($record->processed_at)->toBeNull()
+            ->and($record->failed_at)->not->toBeNull()
+            ->and($record->last_error)->toBe('Deferred operation failed.')
+            ->and($record->due_at?->format('Y-m-d H:i:s'))->toBe(Date::now()->format('Y-m-d H:i:s'));
+    });
+
+    test('it stores retry state after a failed attempt before exhausting max attempts', function (): void {
+        $record = resolve(SequencerManager::class)->defer(
+            operation: 'failing_operation',
+            payload: ['id' => 1],
+            dueAt: Date::now()->subMinute(),
+            maxAttempts: 2,
+        );
+
+        $stats = resolve(DeferredOperationProcessor::class)->processDue();
+        $record->refresh();
+
+        expect($stats['retried'])->toBe(1)
+            ->and($record->status)->toBe(DeferredOperationStatus::Pending)
+            ->and($record->attempts)->toBe(1)
+            ->and($record->reserved_at)->toBeNull()
+            ->and($record->processed_at)->toBeNull()
+            ->and($record->failed_at)->toBeNull()
+            ->and($record->last_error)->toBe('Deferred operation failed.')
+            ->and($record->due_at?->format('Y-m-d H:i:s'))->toBe(Date::now()->format('Y-m-d H:i:s'));
+    });
+
+    test('it retries unresolved persisted identifiers before marking them failed', function (): void {
+        $record = DeferredOperation::query()->create([
+            'operation' => 'missing_deferred_operation',
+            'payload' => ['id' => 1],
+            'due_at' => Date::now()->subMinute(),
+            'status' => DeferredOperationStatus::Pending,
+            'attempts' => 0,
+            'max_attempts' => 2,
+        ]);
+
+        $firstRun = resolve(DeferredOperationProcessor::class)->processDue();
+        $record->refresh();
+
+        expect($firstRun['retried'])->toBe(1)
+            ->and($record->status)->toBe(DeferredOperationStatus::Pending)
+            ->and($record->attempts)->toBe(1)
+            ->and($record->last_error)->toContain('could not be resolved');
+
+        $secondRun = resolve(DeferredOperationProcessor::class)->processDue();
+        $record->refresh();
+
+        expect($secondRun['failed'])->toBe(1)
+            ->and($record->status)->toBe(DeferredOperationStatus::Failed)
+            ->and($record->attempts)->toBe(2)
+            ->and($record->failed_at)->not->toBeNull()
+            ->and($record->last_error)->toContain('could not be resolved');
     });
 });

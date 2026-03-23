@@ -43,4 +43,27 @@ describe('Process Deferred Command', function (): void {
                 'business_entity_id' => 777,
             ]);
     });
+
+    test('it respects the processing limit option', function (): void {
+        resolve(SequencerManager::class)->defer(
+            operation: 'help_new_organization_email',
+            payload: ['business_entity_id' => 111],
+            dueAt: Date::now()->subMinutes(2),
+        );
+
+        resolve(SequencerManager::class)->defer(
+            operation: 'help_new_organization_email',
+            payload: ['business_entity_id' => 222],
+            dueAt: Date::now()->subMinute(),
+        );
+
+        $this->artisan('sequencer:deferred-process', ['--limit' => 1])
+            ->assertSuccessful()
+            ->expectsOutputToContain('Processed 1 deferred operation(s).');
+
+        expect(HelpNewOrganizationEmailOperation::$executed)->toBeTrue()
+            ->and(HelpNewOrganizationEmailOperation::$payload)->toMatchArray([
+                'business_entity_id' => 111,
+            ]);
+    });
 });
