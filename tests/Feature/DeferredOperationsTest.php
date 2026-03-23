@@ -82,6 +82,41 @@ describe('Deferred Operations', function (): void {
             ]);
     });
 
+    test('it marks successful deferred operations completed and does not reprocess them', function (): void {
+        $record = resolve(SequencerManager::class)->defer(
+            operation: 'help_new_organization_email',
+            payload: [
+                'business_entity_id' => 42,
+                'email' => 'hello@example.com',
+                'locale' => 'fi',
+            ],
+            dueAt: Date::now()->subMinute(),
+        );
+
+        $firstRun = resolve(DeferredOperationProcessor::class)->processDue();
+        $record->refresh();
+
+        HelpNewOrganizationEmailOperation::reset();
+
+        $secondRun = resolve(DeferredOperationProcessor::class)->processDue();
+
+        expect($firstRun['processed'])->toBe(1)
+            ->and($firstRun['completed'])->toBe(1)
+            ->and($record->status)->toBe(DeferredOperationStatus::Completed)
+            ->and($record->processed_at)->not->toBeNull()
+            ->and($record->reserved_at)->toBeNull()
+            ->and($record->last_error)->toBeNull()
+            ->and($record->attempts)->toBe(1)
+            ->and($secondRun)->toBe([
+                'processed' => 0,
+                'completed' => 0,
+                'failed' => 0,
+                'retried' => 0,
+            ])
+            ->and(HelpNewOrganizationEmailOperation::$executed)->toBeFalse()
+            ->and(HelpNewOrganizationEmailOperation::$payload)->toBeNull();
+    });
+
     test('it supports alias remapping for moved deferred operation classes', function (): void {
         config()->set('sequencer.deferred.taskMap', [
             'help_new_organization_email' => MovedHelpNewOrganizationEmailOperation::class,
