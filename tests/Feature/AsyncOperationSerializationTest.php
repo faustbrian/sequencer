@@ -310,6 +310,114 @@ PHP
     }
 });
 
+test('queued job re-resolves operation paths after a release path changes', function (): void {
+    $operationRelativePath = 'database/operations/2026_04_08_000001_release_safe_operation.php';
+    $markerFile = sys_get_temp_dir().'/sequencer_release_safe_marker.txt';
+    $oldReleasePath = sys_get_temp_dir().'/sequencer_old_release_'.bin2hex(random_bytes(8));
+    $newReleasePath = sys_get_temp_dir().'/sequencer_new_release_'.bin2hex(random_bytes(8));
+    $oldOperationPath = $oldReleasePath.'/'.$operationRelativePath;
+    $newOperationPath = $newReleasePath.'/'.$operationRelativePath;
+    $originalBasePath = app()->basePath();
+    $originalDatabasePath = app()->databasePath();
+
+    mkdir(dirname($oldOperationPath), 0o755, true);
+    mkdir(dirname($newOperationPath), 0o755, true);
+
+    file_put_contents(
+        $oldOperationPath,
+        <<<PHP
+<?php
+
+use Cline\\Sequencer\\Contracts\\Asynchronous;
+use Cline\\Sequencer\\Contracts\\Operation;
+
+return new class implements Asynchronous, Operation {
+    public function handle(): void
+    {
+        file_put_contents('{$markerFile}', 'old-release');
+    }
+};
+PHP
+    );
+
+    file_put_contents(
+        $newOperationPath,
+        <<<PHP
+<?php
+
+use Cline\\Sequencer\\Contracts\\Asynchronous;
+use Cline\\Sequencer\\Contracts\\Operation;
+
+return new class implements Asynchronous, Operation {
+    public function handle(): void
+    {
+        file_put_contents('{$markerFile}', 'new-release');
+    }
+};
+PHP
+    );
+
+    try {
+        if (file_exists($markerFile)) {
+            unlink($markerFile);
+        }
+
+        $record = OperationModel::query()->create([
+            'name' => 'release_safe_operation',
+            'type' => 'async',
+            'executed_at' => now(),
+            'state' => OperationState::Pending,
+        ]);
+
+        $job = new ExecuteOperation($oldOperationPath, $record->id);
+        $serialized = serialize($job);
+
+        unlink($oldOperationPath);
+
+        app()->setBasePath($newReleasePath);
+        app()->useDatabasePath($newReleasePath.'/database');
+
+        $restoredJob = unserialize($serialized);
+        $restoredJob->handle();
+
+        expect(file_exists($markerFile))->toBeTrue()
+            ->and(file_get_contents($markerFile))->toBe('new-release');
+
+        $record->refresh();
+        expect($record->completed_at)->not->toBeNull();
+    } finally {
+        app()->setBasePath($originalBasePath);
+        app()->useDatabasePath($originalDatabasePath);
+
+        if (file_exists($oldOperationPath)) {
+            unlink($oldOperationPath);
+        }
+
+        if (file_exists($newOperationPath)) {
+            unlink($newOperationPath);
+        }
+
+        foreach ([
+            dirname($oldOperationPath),
+            dirname($newOperationPath),
+            $oldReleasePath.'/database',
+            $newReleasePath.'/database',
+            $oldReleasePath,
+            $newReleasePath,
+        ] as $directory) {
+            if (!is_dir($directory)) {
+                continue;
+            }
+
+            rmdir($directory);
+        }
+
+        if (file_exists($markerFile)) {
+            unlink($markerFile);
+        }
+    }
+});
+
 test('lifecycle hooks work with re-instantiated operations', function (): void {
     $operationFile = database_path('operations/test_lifecycle_operation.php');
     $beforeMarker = sys_get_temp_dir().'/sequencer_test_before.txt';

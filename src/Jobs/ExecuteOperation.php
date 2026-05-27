@@ -44,9 +44,17 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 use function array_values;
+use function base_path;
+use function basename;
 use function config;
+use function file_exists;
 use function hrtime;
 use function is_array;
+use function mb_rtrim;
+use function mb_substr;
+use function preg_match;
+use function sprintf;
+use function str_starts_with;
 
 /**
  * Queue job for executing operations asynchronously.
@@ -153,8 +161,7 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
         private readonly int|string $recordId,
     ) {
         // Require operation file to get instance for configuration
-        /** @var Operation $operation */
-        $operation = require $this->operationPath;
+        $operation = $this->loadOperation();
 
         // Apply retry configuration from operation if it implements Retryable
         if ($operation instanceof Retryable) {
@@ -189,8 +196,7 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
      */
     public function middleware(): array
     {
-        /** @var Operation $operation */
-        $operation = require $this->operationPath;
+        $operation = $this->loadOperation();
 
         if ($operation instanceof HasMiddleware) {
             return array_values($operation->middleware());
@@ -210,8 +216,7 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
      */
     public function tags(): array
     {
-        /** @var Operation $operation */
-        $operation = require $this->operationPath;
+        $operation = $this->loadOperation();
 
         if ($operation instanceof HasTags) {
             return array_values($operation->tags());
@@ -231,8 +236,7 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
      */
     public function uniqueId(): string
     {
-        /** @var Operation $operation */
-        $operation = require $this->operationPath;
+        $operation = $this->loadOperation();
 
         if ($operation instanceof ShouldBeUnique) {
             return $operation->uniqueId();
@@ -252,8 +256,7 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
      */
     public function uniqueFor(): int
     {
-        /** @var Operation $operation */
-        $operation = require $this->operationPath;
+        $operation = $this->loadOperation();
 
         if ($operation instanceof ShouldBeUnique) {
             return $operation->uniqueFor();
@@ -276,8 +279,7 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
      */
     public function uniqueVia(): Repository
     {
-        /** @var Operation $operation */
-        $operation = require $this->operationPath;
+        $operation = $this->loadOperation();
 
         if ($operation instanceof ShouldBeUnique) {
             $repository = $operation->uniqueVia();
@@ -306,8 +308,7 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
         $record = OperationModel::query()->findOrFail($this->recordId);
 
         // Require operation file to get instance
-        /** @var Operation $operation */
-        $operation = require $this->operationPath;
+        $operation = $this->loadOperation();
 
         Event::dispatch(
             new OperationStarted($operation, ExecutionMethod::Async),
@@ -421,5 +422,74 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
             'exception' => $exception::class,
             'message' => $exception->getMessage(),
         ]);
+    }
+
+    /**
+     * Require the operation from a deploy-safe path.
+     *
+     * Jobs may outlive the release path they were dispatched from. When the original
+     * absolute path no longer exists, re-resolve the operation against the current
+     * discovery paths and the current app base path before failing.
+     *
+     * @return Operation Loaded operation instance
+     */
+    private function loadOperation(): Operation
+    {
+        /** @var Operation $operation */
+        $operation = require $this->resolveOperationPath();
+
+        return $operation;
+    }
+
+    /**
+     * Resolve the current filesystem path for the operation file.
+     *
+     * @return string Absolute path to the operation file
+     */
+    private function resolveOperationPath(): string
+    {
+        if (file_exists($this->operationPath)) {
+            return $this->operationPath;
+        }
+
+        $basename = basename($this->operationPath);
+        $relativePath = $this->extractRelativeOperationPath();
+
+        /** @var array<int, string> $discoveryPaths */
+        $discoveryPaths = config('sequencer.execution.discovery_paths', [base_path('database/operations')]);
+
+        foreach ($discoveryPaths as $discoveryPath) {
+            $candidatePath = sprintf('%s/%s', mb_rtrim($discoveryPath, '/'), $basename);
+
+            if (file_exists($candidatePath)) {
+                return $candidatePath;
+            }
+        }
+
+        if ($relativePath !== null) {
+            $candidatePath = base_path($relativePath);
+
+            if (file_exists($candidatePath)) {
+                return $candidatePath;
+            }
+        }
+
+        return $this->operationPath;
+    }
+
+    /**
+     * Extract an app-relative operation path from a stale absolute path.
+     *
+     * @return null|string Relative path such as database/operations/example.php
+     */
+    private function extractRelativeOperationPath(): ?string
+    {
+        if (preg_match('#(?:^|/)(database/operations/.+)$#', $this->operationPath, $matches) !== 1) {
+            return null;
+        }
+
+        return str_starts_with($matches[1], '/')
+            ? mb_substr($matches[1], 1)
+            : $matches[1];
     }
 }

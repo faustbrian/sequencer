@@ -10,3 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added repository-level maintainer guidance in `AGENTS.md`.
 - Initial release
+
+### Fixed
+- Re-resolve queued async operation files from the current app discovery
+  paths when the original release path no longer exists during
+  zero-downtime deployments.
