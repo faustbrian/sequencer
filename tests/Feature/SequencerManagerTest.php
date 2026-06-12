@@ -9,6 +9,7 @@
 
 use Cline\Sequencer\Database\Models\Operation;
 use Cline\Sequencer\Database\Models\OperationError;
+use Cline\Sequencer\Enums\OperationState;
 use Cline\Sequencer\Exceptions\OperationNotRollbackableException;
 use Cline\Sequencer\Facades\Sequencer;
 use Cline\Sequencer\Orchestrators\BatchOrchestrator;
@@ -16,6 +17,7 @@ use Illuminate\Bus\PendingBatch;
 use Illuminate\Foundation\Bus\PendingChain;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Queue;
 use Tests\Fixtures\Operations\BasicOperation;
 use Tests\Fixtures\Operations\ConditionalOperation;
 use Tests\Fixtures\Operations\RollbackableOperation;
@@ -63,6 +65,24 @@ test('executeSync executes operation synchronously', function (): void {
 
     expect(Operation::named('2024_01_01_000001_basic_operation')->completed()->exists())
         ->toBeTrue();
+});
+
+test('execute does not dispatch an operation that is already pending', function (): void {
+    Queue::fake();
+
+    $operation = __DIR__.'/../Support/TestOperations/2024_01_01_000001_basic_operation.php';
+
+    Operation::query()->create([
+        'name' => '2024_01_01_000001_basic_operation',
+        'type' => 'async',
+        'state' => OperationState::Pending,
+        'executed_at' => now(),
+    ]);
+
+    Sequencer::execute($operation, async: true);
+
+    Queue::assertNothingPushed();
+    expect(Operation::query()->count())->toBe(1);
 });
 
 test('chain returns PendingChain', function (): void {

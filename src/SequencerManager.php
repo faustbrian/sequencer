@@ -284,8 +284,13 @@ final class SequencerManager
         $jobs = [];
 
         foreach ($operations as $operation) {
-            $instance = $this->loadOperation($operation);
             $operationName = $this->resolveOperationName($operation);
+
+            if ($this->hasPendingOperation($operationName)) {
+                continue;
+            }
+
+            $instance = $this->loadOperation($operation);
             $operationPath = $this->resolveOperationPath($operation);
 
             $record = OperationModel::query()->create([
@@ -323,8 +328,13 @@ final class SequencerManager
         $jobs = [];
 
         foreach ($operations as $operation) {
-            $instance = $this->loadOperation($operation);
             $operationName = $this->resolveOperationName($operation);
+
+            if ($this->hasPendingOperation($operationName)) {
+                continue;
+            }
+
+            $instance = $this->loadOperation($operation);
             $operationPath = $this->resolveOperationPath($operation);
 
             $record = OperationModel::query()->create([
@@ -625,6 +635,16 @@ final class SequencerManager
             return;
         }
 
+        if ($this->hasPendingOperation($operationName)) {
+            /** @var string $logChannel */
+            $logChannel = config('sequencer.errors.log_channel', 'stack');
+            Log::channel($logChannel)->info('Operation dispatch skipped because it is already pending', [
+                'operation' => $operationName,
+            ]);
+
+            return;
+        }
+
         $record = OperationModel::query()->create([
             'name' => $operationName,
             'type' => $async ? ExecutionMethod::Async->value : ExecutionMethod::Sync->value,
@@ -759,6 +779,20 @@ final class SequencerManager
 
             throw $throwable;
         }
+    }
+
+    /**
+     * Determine if an operation already has an in-flight record.
+     *
+     * Prevents duplicate dispatch when a previous execution has started but has
+     * not yet reached a terminal state.
+     */
+    private function hasPendingOperation(string $operationName): bool
+    {
+        return OperationModel::query()
+            ->whereIn('name', [$operationName, $operationName.'.php'])
+            ->where('state', OperationState::Pending)
+            ->exists();
     }
 
     /**

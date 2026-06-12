@@ -8,6 +8,7 @@
  */
 
 use Cline\Sequencer\Database\Models\Operation as OperationModel;
+use Cline\Sequencer\Enums\OperationState;
 use Cline\Sequencer\Jobs\ExecuteOperation;
 use Cline\Sequencer\SequentialOrchestrator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -126,6 +127,38 @@ PHP;
         // Assert
         expect(OperationModel::query()->count())->toBe(0);
     })->group('integration', 'edge-case');
+
+    test('does not redispatch an operation that already has a pending record', function (): void {
+        // Arrange
+        QueueFacade::fake();
+
+        $operationContent = <<<'PHP'
+<?php
+use Cline\Sequencer\Contracts\Asynchronous;
+use Cline\Sequencer\Contracts\Operation;
+
+return new class() implements Asynchronous, Operation {
+    public function handle(): void {}
+};
+PHP;
+
+        File::put($this->tempDir.'/2024_01_01_000000_pending_operation.php', $operationContent);
+
+        OperationModel::query()->create([
+            'name' => '2024_01_01_000000_pending_operation',
+            'type' => 'async',
+            'executed_at' => now(),
+            'state' => OperationState::Pending,
+        ]);
+
+        // Act
+        $orchestrator = resolve(SequentialOrchestrator::class);
+        $orchestrator->process();
+
+        // Assert
+        QueueFacade::assertNothingPushed();
+        expect(OperationModel::query()->count())->toBe(1);
+    })->group('integration', 'regression');
 
     describe('Migration Integration', function (): void {
         beforeEach(function (): void {

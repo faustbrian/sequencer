@@ -15,3 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Re-resolve queued async operation files from the current app discovery
   paths when the original release path no longer exists during
   zero-downtime deployments.
+- Skip redispatching operations that already have a pending execution
+  record so the same operation cannot be queued or started again before
+  reaching a terminal state.

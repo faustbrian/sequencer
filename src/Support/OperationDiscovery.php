@@ -10,6 +10,7 @@
 namespace Cline\Sequencer\Support;
 
 use Cline\Sequencer\Database\Models\Operation;
+use Cline\Sequencer\Enums\OperationState;
 use Cline\Sequencer\Exceptions\OperationNeverExecutedException;
 use Illuminate\Support\Facades\File;
 
@@ -76,6 +77,7 @@ final class OperationDiscovery
         }
 
         $executed = $this->getExecutedOperations();
+        $inFlight = $this->getPendingOperations();
         $pending = [];
 
         foreach ($discovered as $operation) {
@@ -83,6 +85,9 @@ final class OperationDiscovery
                 continue;
             }
 
+            if (in_array($operation['name'], $inFlight, true)) {
+                continue;
+            }
             $pending[] = $operation;
         }
 
@@ -102,6 +107,28 @@ final class OperationDiscovery
         /** @var list<string> $names */
         $names = Operation::query()
             ->whereNotNull('completed_at')
+            ->pluck('name')
+            ->all();
+
+        return array_map(
+            static fn (string $name): string => str_ends_with($name, '.php') ? mb_substr($name, 0, -4) : $name,
+            $names,
+        );
+    }
+
+    /**
+     * Get list of operations that are currently in-flight.
+     *
+     * Pending operations have started but have not reached a terminal state yet,
+     * so they must not be rediscovered and dispatched again.
+     *
+     * @return list<string> Operation names that are still pending
+     */
+    private function getPendingOperations(): array
+    {
+        /** @var list<string> $names */
+        $names = Operation::query()
+            ->where('state', OperationState::Pending)
             ->pluck('name')
             ->all();
 

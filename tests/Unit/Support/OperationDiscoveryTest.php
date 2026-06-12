@@ -104,6 +104,23 @@ test('returns empty array when all operations executed', function (): void {
     expect($result)->toHaveCount(0);
     expect($result)->toBe([]);
 })->group('happy-path');
+test('excludes operations that already have a pending record', function (): void {
+    // Arrange
+    createOperationFile('2024_01_15_120000_CreateUsersTable.php', $this->testPath);
+
+    Operation::query()->create([
+        'name' => '2024_01_15_120000_CreateUsersTable',
+        'type' => 'async',
+        'executed_at' => now(),
+        'state' => OperationState::Pending,
+    ]);
+
+    // Act
+    $result = $this->discovery->getPending();
+
+    // Assert
+    expect($result)->toBe([]);
+})->group('regression');
 test('parses operation filenames correctly', function (): void {
     // Arrange
     createOperationFile('2024_01_15_120000_CreateUsersTable.php', $this->testPath);
