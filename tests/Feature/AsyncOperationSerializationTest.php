@@ -11,6 +11,7 @@ use Cline\Sequencer\Database\Models\Operation as OperationModel;
 use Cline\Sequencer\Enums\OperationState;
 use Cline\Sequencer\Jobs\ExecuteOperation;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Tests\Fixtures\Operations\AsyncOperation;
 
@@ -46,7 +47,7 @@ PHP
     try {
         // Clean up marker file if it exists
         if (file_exists($executionMarkerFile)) {
-            unlink($executionMarkerFile);
+            File::delete($executionMarkerFile);
         }
 
         $record = OperationModel::query()->create([
@@ -77,11 +78,11 @@ PHP
     } finally {
         // Cleanup
         if (file_exists($operationFile)) {
-            unlink($operationFile);
+            File::delete($operationFile);
         }
 
         if (file_exists($executionMarkerFile)) {
-            unlink($executionMarkerFile);
+            File::delete($executionMarkerFile);
         }
     }
 });
@@ -130,7 +131,7 @@ PHP
         expect($record->completed_at)->not->toBeNull();
     } finally {
         if (file_exists($wrapperFile)) {
-            unlink($wrapperFile);
+            File::delete($wrapperFile);
         }
     }
 });
@@ -247,7 +248,7 @@ PHP
             ->and($job->uniqueFor())->toBe(7_200);
     } finally {
         if (file_exists($operationFile)) {
-            unlink($operationFile);
+            File::delete($operationFile);
         }
     }
 });
@@ -279,7 +280,7 @@ PHP
 
     try {
         if (file_exists($markerFile)) {
-            unlink($markerFile);
+            File::delete($markerFile);
         }
 
         $record = OperationModel::query()->create([
@@ -301,11 +302,11 @@ PHP
         expect($record->completed_at)->not->toBeNull();
     } finally {
         if (file_exists($operationFile)) {
-            unlink($operationFile);
+            File::delete($operationFile);
         }
 
         if (file_exists($markerFile)) {
-            unlink($markerFile);
+            File::delete($markerFile);
         }
     }
 });
@@ -359,7 +360,7 @@ PHP
 
     try {
         if (file_exists($markerFile)) {
-            unlink($markerFile);
+            File::delete($markerFile);
         }
 
         $record = OperationModel::query()->create([
@@ -372,7 +373,7 @@ PHP
         $job = new ExecuteOperation($oldOperationPath, $record->id);
         $serialized = serialize($job);
 
-        unlink($oldOperationPath);
+        File::delete($oldOperationPath);
 
         app()->setBasePath($newReleasePath);
         app()->useDatabasePath($newReleasePath.'/database');
@@ -390,11 +391,11 @@ PHP
         app()->useDatabasePath($originalDatabasePath);
 
         if (file_exists($oldOperationPath)) {
-            unlink($oldOperationPath);
+            File::delete($oldOperationPath);
         }
 
         if (file_exists($newOperationPath)) {
-            unlink($newOperationPath);
+            File::delete($newOperationPath);
         }
 
         foreach ([
@@ -413,7 +414,7 @@ PHP
         }
 
         if (file_exists($markerFile)) {
-            unlink($markerFile);
+            File::delete($markerFile);
         }
     }
 });
@@ -464,7 +465,7 @@ PHP
                 continue;
             }
 
-            unlink($marker);
+            File::delete($marker);
         }
 
         $record = OperationModel::query()->create([
@@ -483,7 +484,7 @@ PHP
             ->and(file_exists($afterMarker))->toBeTrue();
     } finally {
         if (file_exists($operationFile)) {
-            unlink($operationFile);
+            File::delete($operationFile);
         }
 
         foreach ([$beforeMarker, $handleMarker, $afterMarker] as $marker) {
@@ -491,7 +492,7 @@ PHP
                 continue;
             }
 
-            unlink($marker);
+            File::delete($marker);
         }
     }
 });
@@ -533,7 +534,7 @@ PHP
 
     try {
         if (file_exists($failedMarker)) {
-            unlink($failedMarker);
+            File::delete($failedMarker);
         }
 
         $record = OperationModel::query()->create([
@@ -557,11 +558,11 @@ PHP
         expect($record->failed_at)->not->toBeNull();
     } finally {
         if (file_exists($operationFile)) {
-            unlink($operationFile);
+            File::delete($operationFile);
         }
 
         if (file_exists($failedMarker)) {
-            unlink($failedMarker);
+            File::delete($failedMarker);
         }
     }
 });
@@ -606,7 +607,7 @@ PHP
         Queue::assertPushed(ExecuteOperation::class, fn ($job): bool => $job->uniqueId() === (string) $record->id);
     } finally {
         if (file_exists($operationFile)) {
-            unlink($operationFile);
+            File::delete($operationFile);
         }
     }
 });
@@ -657,7 +658,7 @@ PHP
             ->and($record->failed_at)->toBeNull();
     } finally {
         if (file_exists($operationFile)) {
-            unlink($operationFile);
+            File::delete($operationFile);
         }
     }
 })->group('state-transitions');
@@ -710,7 +711,7 @@ PHP
             ->and($record->completed_at)->toBeNull();
     } finally {
         if (file_exists($operationFile)) {
-            unlink($operationFile);
+            File::delete($operationFile);
         }
     }
 })->group('state-transitions');
@@ -772,7 +773,7 @@ PHP
             ->and($record->failed_at)->toBeNull();
     } finally {
         if (file_exists($operationFile)) {
-            unlink($operationFile);
+            File::delete($operationFile);
         }
     }
 })->group('state-transitions');
@@ -829,7 +830,7 @@ PHP
             ->and($record->completed_at)->toBeNull();
     } finally {
         if (file_exists($operationFile)) {
-            unlink($operationFile);
+            File::delete($operationFile);
         }
     }
 })->group('state-transitions');
@@ -879,7 +880,7 @@ PHP
             ->and($record->errors->first()->exception)->toBe(RuntimeException::class);
     } finally {
         if (file_exists($operationFile)) {
-            unlink($operationFile);
+            File::delete($operationFile);
         }
     }
 })->group('state-transitions');
@@ -927,7 +928,7 @@ PHP
             ->and($record->state->isTerminal())->toBeTrue();
     } finally {
         if (file_exists($operationFile)) {
-            unlink($operationFile);
+            File::delete($operationFile);
         }
     }
 })->group('state-transitions');
@@ -976,7 +977,7 @@ PHP
             ->and($record->state->isTerminal())->toBeTrue();
     } finally {
         if (file_exists($operationFile)) {
-            unlink($operationFile);
+            File::delete($operationFile);
         }
     }
 })->group('state-transitions');

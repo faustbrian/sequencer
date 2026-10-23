@@ -85,21 +85,6 @@ final class Operation extends Model
     ];
 
     /**
-     * Attribute casting configuration.
-     *
-     * @var array<string, string>
-     */
-    #[Override()]
-    protected $casts = [
-        'executed_at' => 'datetime',
-        'completed_at' => 'datetime',
-        'failed_at' => 'datetime',
-        'skipped_at' => 'datetime',
-        'rolled_back_at' => 'datetime',
-        'state' => OperationState::class,
-    ];
-
-    /**
      * Get the table name from configuration.
      *
      * Retrieves the configured table name from sequencer.table_names.operations,
@@ -144,5 +129,22 @@ final class Operation extends Model
         $model = Config::get('sequencer.models.operation_error', OperationError::class);
 
         return $this->hasMany($model, 'operation_id');
+    }
+
+    /**
+     * Attribute casting configuration.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'executed_at' => 'datetime',
+            'completed_at' => 'datetime',
+            'failed_at' => 'datetime',
+            'skipped_at' => 'datetime',
+            'rolled_back_at' => 'datetime',
+            'state' => OperationState::class,
+        ];
     }
 }

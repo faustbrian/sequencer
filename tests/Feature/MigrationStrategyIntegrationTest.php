@@ -438,7 +438,7 @@ PHP;
             expect(Operation::query()->where('name', 'like', '%timestamp_test%')->exists())->toBeTrue();
         } finally {
             // Cleanup
-            unlink($migrationDir.'/2024_01_02_000000_test_migration.php');
+            File::delete($migrationDir.'/2024_01_02_000000_test_migration.php');
             rmdir($migrationDir);
         }
     });

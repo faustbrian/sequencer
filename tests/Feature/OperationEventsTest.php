@@ -17,6 +17,7 @@ use Cline\Sequencer\Events\OperationStarted;
 use Cline\Sequencer\Facades\Sequencer;
 use Cline\Sequencer\SequentialOrchestrator;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\File;
 
 test('OperationStarted and OperationEnded events fire for sync operation', function (): void {
     $startedFired = false;
@@ -75,7 +76,7 @@ PHP;
         $orchestrator->process(isolate: false);
     } finally {
         // Cleanup
-        unlink(sprintf('%s/%s.php', $tempDir, $operationName));
+        File::delete(sprintf('%s/%s.php', $tempDir, $operationName));
         rmdir($tempDir);
     }
 

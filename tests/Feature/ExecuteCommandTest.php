@@ -9,6 +9,7 @@
 
 use Cline\Sequencer\Commands\ExecuteCommand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -41,7 +42,7 @@ describe('Execute Command', function (): void {
                 continue;
             }
 
-            unlink($file);
+            File::delete($file);
         }
     });
 

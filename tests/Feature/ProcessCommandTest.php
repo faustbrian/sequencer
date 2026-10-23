@@ -8,6 +8,7 @@
  */
 
 use Cline\Sequencer\Commands\ProcessCommand;
+use Illuminate\Support\Facades\File;
 
 /**
  * Process Command Test Suite
@@ -117,7 +118,7 @@ describe('Process Command', function (): void {
             $result->expectsOutputToContain('Processed');
 
             // Cleanup
-            unlink($operationPath);
+            File::delete($operationPath);
         })->group('happy-path', 'command');
 
         test('dry-run displays correct output format', function (): void {
@@ -232,7 +233,7 @@ describe('Process Command', function (): void {
             $result->expectsOutput('Filtering by tags: billing');
 
             // Cleanup
-            unlink($operationPath);
+            File::delete($operationPath);
         })->group('edge-case', 'command');
 
         test('executes with multiple tags flag filters operations by any matching tag', function (): void {
@@ -248,7 +249,7 @@ describe('Process Command', function (): void {
             $result->expectsOutput('Filtering by tags: billing, data-migration');
 
             // Cleanup
-            unlink($operationPath);
+            File::delete($operationPath);
         })->group('edge-case', 'command');
 
         test('dry-run with tags flag filters preview correctly', function (): void {
@@ -267,7 +268,7 @@ describe('Process Command', function (): void {
             $result->expectsOutputToContain('Dry-run mode: Previewing execution order...');
 
             // Cleanup
-            unlink($operationPath);
+            File::delete($operationPath);
         })->group('edge-case', 'command');
     });
 
