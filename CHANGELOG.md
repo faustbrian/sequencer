@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release
 
 ### Fixed
+- Keep worker-concurrency formatting consistent when pcntl constants are present,
+  cover recovery of persisted claims without reservation timestamps, and isolate
+  command discovery inputs from parallel test workers.
 - Preserve Laravel 10-compatible model casts and queue traits under current
   refactor tooling. Require persisted claims before executing handlers and keep
   large drains below database parameter ceilings without narrowing public limits.

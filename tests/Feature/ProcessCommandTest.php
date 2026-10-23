@@ -22,10 +22,15 @@ covers(ProcessCommand::class);
 
 describe('Process Command', function (): void {
     beforeEach(function (): void {
-        // Configure discovery paths to include test fixtures
-        config()->set('sequencer.execution.discovery_paths', [
-            __DIR__.'/../Fixtures/Operations',
-        ]);
+        // Each parallel test owns its discovery input; sibling workers may create
+        // operations in the shared fixture directory while this command scans.
+        $this->operationFixturePath = sys_get_temp_dir().'/sequencer-process-'.bin2hex(random_bytes(8));
+        File::makeDirectory($this->operationFixturePath);
+        config()->set('sequencer.execution.discovery_paths', [$this->operationFixturePath]);
+    });
+
+    afterEach(function (): void {
+        File::deleteDirectory($this->operationFixturePath);
     });
 
     describe('Happy Paths', function (): void {
@@ -103,7 +108,7 @@ describe('Process Command', function (): void {
         test('executes with repeat flag for re-executing completed operations', function (): void {
             // Arrange
             // First create and execute an operation
-            $operationPath = __DIR__.'/../Fixtures/Operations/2024_01_01_120000_RepeatTestOperation.php';
+            $operationPath = $this->operationFixturePath.'/2024_01_01_120000_RepeatTestOperation.php';
             file_put_contents($operationPath, "<?php\nreturn new class implements \\Cline\\Sequencer\\Contracts\\Operation {\n    public function handle(): void {}\n};");
 
             // Execute once to mark as completed
@@ -222,7 +227,7 @@ describe('Process Command', function (): void {
 
         test('executes with tags flag filters operations by tag', function (): void {
             // Arrange
-            $operationPath = __DIR__.'/../Fixtures/Operations/2024_01_01_130000_TaggedOperation.php';
+            $operationPath = $this->operationFixturePath.'/2024_01_01_130000_TaggedOperation.php';
             file_put_contents($operationPath, "<?php\nreturn new class implements \\Cline\\Sequencer\\Contracts\\Operation, \\Cline\\Sequencer\\Contracts\\HasTags {\n    public function handle(): void {}\n    public function tags(): array { return ['billing', 'critical']; }\n};");
 
             // Act
@@ -238,7 +243,7 @@ describe('Process Command', function (): void {
 
         test('executes with multiple tags flag filters operations by any matching tag', function (): void {
             // Arrange
-            $operationPath = __DIR__.'/../Fixtures/Operations/2024_01_01_140000_MultiTagOperation.php';
+            $operationPath = $this->operationFixturePath.'/2024_01_01_140000_MultiTagOperation.php';
             file_put_contents($operationPath, "<?php\nreturn new class implements \\Cline\\Sequencer\\Contracts\\Operation, \\Cline\\Sequencer\\Contracts\\HasTags {\n    public function handle(): void {}\n    public function tags(): array { return ['data-migration']; }\n};");
 
             // Act
@@ -254,7 +259,7 @@ describe('Process Command', function (): void {
 
         test('dry-run with tags flag filters preview correctly', function (): void {
             // Arrange
-            $operationPath = __DIR__.'/../Fixtures/Operations/2024_01_01_150000_PreviewTagOperation.php';
+            $operationPath = $this->operationFixturePath.'/2024_01_01_150000_PreviewTagOperation.php';
             file_put_contents($operationPath, "<?php\nreturn new class implements \\Cline\\Sequencer\\Contracts\\Operation, \\Cline\\Sequencer\\Contracts\\HasTags {\n    public function handle(): void {}\n    public function tags(): array { return ['test-tag']; }\n};");
 
             // Act

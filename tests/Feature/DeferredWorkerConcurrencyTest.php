@@ -84,7 +84,7 @@ test('independent workers serialize claims and recover a lost or expired owner',
             ->and($row->fresh()->status)->toBe(DeferredOperationStatus::Processing);
 
         if ($crash) {
-            expect(posix_kill($workers[0]['pid'], SIGKILL))->toBeTrue();
+            expect(posix_kill($workers[0]['pid'], \SIGKILL))->toBeTrue();
             pcntl_waitpid($workers[0]['pid'], $status);
         }
 
@@ -111,11 +111,11 @@ test('independent workers serialize claims and recover a lost or expired owner',
         foreach ($workers as $worker) {
             fclose($worker['socket']);
 
-            if (pcntl_waitpid($worker['pid'], $status, WNOHANG) !== 0) {
+            if (pcntl_waitpid($worker['pid'], $status, \WNOHANG) !== 0) {
                 continue;
             }
 
-            posix_kill($worker['pid'], SIGKILL);
+            posix_kill($worker['pid'], \SIGKILL);
             pcntl_waitpid($worker['pid'], $status);
         }
 

@@ -38,16 +38,16 @@ afterEach(function (): void {
     Date::setTestNow();
 });
 
-test('recovers only expired reservations including the exact expiry boundary', function (int $age, bool $expired): void {
+test('recovers only expired reservations including the exact expiry boundary', function (?int $age, bool $expired): void {
     $row = resolve(SequencerManager::class)->defer('selected', ['value' => 'recover me'], Date::now());
-    $row->update(['status' => DeferredOperationStatus::Processing, 'attempts' => 1, 'reserved_at' => Date::now()->subSeconds($age)]);
+    $row->update(['status' => DeferredOperationStatus::Processing, 'attempts' => 1, 'reserved_at' => $age === null ? null : Date::now()->subSeconds($age)]);
 
     resolve(DeferredOperationProcessor::class)->processDue();
 
     expect(HelpNewOrganizationEmailOperation::$executed)->toBe($expired)
         ->and($row->fresh()->status)->toBe($expired ? DeferredOperationStatus::Completed : DeferredOperationStatus::Processing)
         ->and($row->fresh()->attempts)->toBe($expired ? 2 : 1);
-})->with([[299, false], [300, true], [301, true]]);
+})->with([[299, false], [300, true], [301, true], [null, true]]);
 
 test('does not reserve the unstarted siblings of a running handler', function (): void {
     resolve(SequencerManager::class)->defer('callback', [], Date::now()->subMinute());
