@@ -13,6 +13,10 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Grammars\SQLiteGrammar;
 use Illuminate\Database\Query\Grammars\SqlServerGrammar;
 use Illuminate\Support\Str;
+use RuntimeException;
+
+use function count;
+use function throw_if;
 
 /**
  * SQLite transports the test. SQL Server parameter compilation and bindings
@@ -22,6 +26,10 @@ final class SqlServerUpdateGrammar extends SqlServerGrammar
 {
     public function compileSelect(Builder $query): string
     {
+        // Native PDO_SQLSRV prepares reject more than 2100 parameters. Keep
+        // that transport limit while SQLite executes this grammar regression.
+        throw_if(count($query->getBindings()) > 2_100, RuntimeException::class, 'SQL Server native prepare parameter ceiling exceeded.');
+
         return new SQLiteGrammar($this->connection)->compileSelect($query);
     }
 

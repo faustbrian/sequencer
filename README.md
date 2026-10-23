@@ -36,6 +36,10 @@ effect before its worker disappears. Handlers must tolerate replay. Expiry does
 not stop an old worker, but its later completion/failure cannot overwrite a
 replacement claim's state. Each invocation visits a record at most once, even
 when retry delay is zero; it leaves fresh reservations and terminal rows alone.
+Candidate keys are selected at invocation start; each reservation is rechecked
+and persisted just before its handler runs. Records becoming due or newly
+created during execution wait until the next invocation. A vetoed model save
+does not execute a handler or count as a completed reservation.
 
 To consume only selected work, repeat the option with exact stored identifiers:
 
@@ -46,8 +50,8 @@ php artisan sequencer:deferred-process --operation=registration_credentials --op
 Unselected rows remain unchanged, including expired reservations. Without an
 option the command still processes all eligible identifiers. Programmatic
 `DeferredOperationProcessor::processDue(100, ['registration_credentials'])` uses
-the same selection; `null` means unrestricted and `[]` means no work. Blank
-identifiers are rejected. Select the persisted alias, not its mapped class name.
+the same selection; `null` means unrestricted and `[]` means no work. Select
+the exact persisted alias (including whitespace), not its mapped class name.
 Schedule restricted commands separately when environments require different work.
 Exact selection supports SQLite, MySQL/MariaDB, PostgreSQL and SQL Server,
 independently of their default collation. A custom unsupported database driver

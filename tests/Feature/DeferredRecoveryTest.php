@@ -210,3 +210,58 @@ test('preserves model lifecycle notifications for terminal and retry disposition
 
     expect($states)->toBe($fails ? ['processing', 'pending', 'processing', 'failed'] : ['processing', 'completed']);
 })->with([false, true]);
+
+test('does not execute or report dispositions when their model save is vetoed', function (bool $exhausted): void {
+    $row = resolve(SequencerManager::class)->defer('selected', ['retain' => 'secret'], Date::now(), maxAttempts: 1);
+
+    if ($exhausted) {
+        $row->update(['status' => DeferredOperationStatus::Processing, 'attempts' => 1, 'reserved_at' => Date::now()->subMinutes(8)]);
+    }
+
+    $snapshot = $row->fresh()->getRawOriginal();
+    DeferredOperation::updating(fn (DeferredOperation $record): bool => $record->status !== ($exhausted ? DeferredOperationStatus::Failed : DeferredOperationStatus::Processing));
+
+    try {
+        $first = resolve(DeferredOperationProcessor::class)->processDue(1);
+        $second = resolve(DeferredOperationProcessor::class)->processDue(1);
+    } finally {
+        DeferredOperation::flushEventListeners();
+    }
+
+    expect(HelpNewOrganizationEmailOperation::$executed)->toBeFalse()
+        ->and($first)->toBe(['processed' => 0, 'completed' => 0, 'failed' => 0, 'retried' => 0])
+        ->and($second)->toBe($first)
+        ->and($row->fresh()->getRawOriginal())->toBe($snapshot);
+})->with([false, true]);
+
+test('drains beyond the native SQL Server binding ceiling without replaying rows', function (): void {
+    $manager = resolve(SequencerManager::class);
+
+    for ($index = 0; $index < 2_200; ++$index) {
+        $manager->defer('selected', [], Date::now());
+    }
+
+    $connection = DB::connection();
+    $original = $connection->getQueryGrammar();
+    $connection->setQueryGrammar(
+        new SqlServerUpdateGrammar($connection),
+    );
+
+    try {
+        $stats = resolve(DeferredOperationProcessor::class)->processDue(2_200);
+    } finally {
+        $connection->setQueryGrammar($original);
+    }
+
+    expect($stats)->toBe(['processed' => 2_200, 'completed' => 2_200, 'failed' => 0, 'retried' => 0])
+        ->and(DeferredOperation::query()->where('status', DeferredOperationStatus::Completed)->count())->toBe(2_200);
+});
+
+test('restricted consumption accepts every exact alias admitted by the registry', function (string $alias): void {
+    config()->set('sequencer.deferred.taskMap', [$alias => HelpNewOrganizationEmailOperation::class]);
+    $row = resolve(SequencerManager::class)->defer($alias, ['exact' => $alias], Date::now());
+    $stats = resolve(DeferredOperationProcessor::class)->processDue(1, [$alias]);
+    expect($stats['completed'])->toBe(1)
+        ->and(HelpNewOrganizationEmailOperation::$payload)->toBe(['exact' => $alias])
+        ->and($row->fresh()->status)->toBe(DeferredOperationStatus::Completed);
+})->with(['', ' ']);

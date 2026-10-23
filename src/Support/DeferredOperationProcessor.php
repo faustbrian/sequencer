@@ -25,7 +25,6 @@ use function count;
 use function implode;
 use function in_array;
 use function is_array;
-use function mb_trim;
 use function throw_if;
 
 /**
@@ -53,31 +52,29 @@ final readonly class DeferredOperationProcessor
             'retried' => 0,
         ];
 
-        foreach ($operations ?? [] as $identifier) {
-            throw_if(mb_trim($identifier) === '', InvalidArgumentException::class, 'Deferred operation selectors must not be blank.');
-        }
-
         /** @var int|string $configuredRetryAfter */
         $configuredRetryAfter = config('sequencer.deferred.retry_after_seconds', 300);
         $retryAfter = (int) $configuredRetryAfter;
         throw_if($retryAfter < 1, InvalidArgumentException::class, 'Deferred reservation expiry must be positive.');
 
-        // Claim immediately before execution, not an entire waiting batch:
-        // otherwise later siblings can expire before their handler even starts.
-        $handled = [];
+        if ($limit < 1) {
+            return $stats;
+        }
 
-        for ($index = 0; $index < $limit; ++$index) {
-            $operationRecord = $this->claimNext($operations, $retryAfter, $handled);
+        // Snapshot keys, not reservations: each record is visited once without a
+        // growing NOT IN binding list (PDO_SQLSRV permits at most 2100 parameters).
+        // Claim only immediately before execution, so waiting siblings do not age.
+        $keys = $this->eligibleOperations($operations, $retryAfter)->oldest('due_at')->limit($limit)->pluck('id');
+
+        foreach ($keys as $key) {
+            /** @var int|string $key */
+            $operationRecord = $this->claim($key, $operations, $retryAfter);
 
             if (!$operationRecord instanceof DeferredOperation) {
-                break;
+                continue;
             }
 
             ++$stats['processed'];
-
-            /** @var int|string $key */
-            $key = $operationRecord->getKey();
-            $handled[] = $key;
 
             if ($operationRecord->status === DeferredOperationStatus::Failed) {
                 ++$stats['failed'];
@@ -113,33 +110,36 @@ final readonly class DeferredOperationProcessor
     }
 
     /**
-     * @param null|list<string> $operations
-     * @param list<int|string>  $handled
+     * @param  null|list<string>          $operations
+     * @return Builder<DeferredOperation>
      */
-    private function claimNext(?array $operations, int $retryAfter, array $handled): ?DeferredOperation
+    private function eligibleOperations(?array $operations, int $retryAfter): Builder
     {
-        return DB::connection()->transaction(function () use ($operations, $retryAfter, $handled): ?DeferredOperation {
-            $query = DeferredOperation::query();
-            $query->whereNotIn('id', $handled);
+        $query = DeferredOperation::query();
 
-            if ($operations !== null) {
-                $this->restrictOperations($query, $operations);
-            }
+        if ($operations !== null) {
+            $this->restrictOperations($query, $operations);
+        }
 
+        return $query->where(fn (Builder $query) => $query
+            ->where(fn (Builder $pending) => $pending
+                ->where('status', DeferredOperationStatus::Pending->value)
+                ->where('due_at', '<=', Date::now()))
+            ->orWhere(fn (Builder $processing) => $processing
+                ->where('status', DeferredOperationStatus::Processing->value)
+                ->where(fn (Builder $expired) => $expired
+                    ->whereNull('reserved_at')
+                    ->orWhere('reserved_at', '<=', Date::now()->subSeconds($retryAfter)))));
+    }
+
+    /**
+     * @param null|list<string> $operations
+     */
+    private function claim(int|string $key, ?array $operations, int $retryAfter): ?DeferredOperation
+    {
+        return DB::connection()->transaction(function () use ($key, $operations, $retryAfter): ?DeferredOperation {
             /** @var null|DeferredOperation $record */
-            $record = $query
-                ->where(fn (Builder $query) => $query
-                    ->where(fn (Builder $pending) => $pending
-                        ->where('status', DeferredOperationStatus::Pending->value)
-                        ->where('due_at', '<=', Date::now()))
-                    ->orWhere(fn (Builder $processing) => $processing
-                        ->where('status', DeferredOperationStatus::Processing->value)
-                        ->where(fn (Builder $expired) => $expired
-                            ->whereNull('reserved_at')
-                            ->orWhere('reserved_at', '<=', Date::now()->subSeconds($retryAfter)))))
-                ->oldest('due_at')
-                ->lockForUpdate()
-                ->first();
+            $record = $this->eligibleOperations($operations, $retryAfter)->whereKey($key)->lockForUpdate()->first();
 
             if ($record === null) {
                 return null;
@@ -148,7 +148,7 @@ final readonly class DeferredOperationProcessor
             // Reservations count as attempts, including a worker lost before
             // its handler starts; a crash cannot reset the retry budget.
             if ($record->attempts >= $record->max_attempts) {
-                $record->update([
+                $saved = $record->update([
                     'status' => DeferredOperationStatus::Failed,
                     'failed_at' => Date::now(),
                     'reserved_at' => null,
@@ -156,16 +156,16 @@ final readonly class DeferredOperationProcessor
                     ...$this->terminalPayload($record),
                 ]);
 
-                return $record;
+                return $saved ? $record : null;
             }
 
-            $record->update([
+            $saved = $record->update([
                 'status' => DeferredOperationStatus::Processing,
                 'reserved_at' => Date::now(),
                 'attempts' => $record->attempts + 1,
             ]);
 
-            return $record;
+            return $saved ? $record : null;
         });
     }
 
