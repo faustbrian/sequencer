@@ -38,8 +38,6 @@ final class OperationBuilder extends Builder
      *
      * Filters operations that have been executed (executed_at is not null).
      *
-     * @return $this
-     *
      * @phpstan-return static
      */
     public function executed(): static
@@ -52,8 +50,6 @@ final class OperationBuilder extends Builder
      * Scope query to completed operations.
      *
      * Filters operations that have completed successfully (completed_at is not null).
-     *
-     * @return $this
      *
      * @phpstan-return static
      */
@@ -68,8 +64,6 @@ final class OperationBuilder extends Builder
      *
      * Filters operations that have failed (failed_at is not null).
      *
-     * @return $this
-     *
      * @phpstan-return static
      */
     public function failed(): static
@@ -82,8 +76,6 @@ final class OperationBuilder extends Builder
      * Scope query to rolled back operations.
      *
      * Filters operations that have been rolled back (rolled_back_at is not null).
-     *
-     * @return $this
      *
      * @phpstan-return static
      */
@@ -98,8 +90,6 @@ final class OperationBuilder extends Builder
      *
      * Filters operations that were skipped during execution (skipped_at is not null).
      *
-     * @return $this
-     *
      * @phpstan-return static
      */
     public function skipped(): static
@@ -112,8 +102,6 @@ final class OperationBuilder extends Builder
      * Scope query to pending operations.
      *
      * Filters operations that have been executed but not yet completed or failed.
-     *
-     * @return $this
      *
      * @phpstan-return static
      */
@@ -130,8 +118,6 @@ final class OperationBuilder extends Builder
      *
      * Filters operations that were executed synchronously (type = 'sync').
      *
-     * @return $this
-     *
      * @phpstan-return static
      */
     public function synchronous(): static
@@ -143,8 +129,6 @@ final class OperationBuilder extends Builder
      * Scope query to asynchronous operations.
      *
      * Filters operations that were executed asynchronously via queue (type = 'async').
-     *
-     * @return $this
      *
      * @phpstan-return static
      */
@@ -158,8 +142,7 @@ final class OperationBuilder extends Builder
      *
      * Filters operations matching a specific operation name or pattern.
      *
-     * @param  string $name Operation name or wildcard pattern
-     * @return $this
+     * @param string $name Operation name or wildcard pattern
      *
      * @phpstan-return static
      */
@@ -177,8 +160,6 @@ final class OperationBuilder extends Builder
      *
      * Filters operations that were executed today (based on executed_at timestamp).
      *
-     * @return $this
-     *
      * @phpstan-return static
      */
     public function today(): static
@@ -192,9 +173,8 @@ final class OperationBuilder extends Builder
      *
      * Filters operations executed between the specified start and end dates.
      *
-     * @param  Carbon|DateTimeInterface|string $start Start date
-     * @param  Carbon|DateTimeInterface|string $end   End date
-     * @return $this
+     * @param Carbon|DateTimeInterface|string $start Start date
+     * @param Carbon|DateTimeInterface|string $end   End date
      *
      * @phpstan-return static
      */
@@ -209,8 +189,7 @@ final class OperationBuilder extends Builder
      *
      * Filters operations executed by a specific polymorphic entity (User, System, etc.).
      *
-     * @param  Model $actor The entity that executed the operation
-     * @return $this
+     * @param Model $actor The entity that executed the operation
      *
      * @phpstan-return static
      */
@@ -225,8 +204,6 @@ final class OperationBuilder extends Builder
      *
      * Filters operations that have associated error records.
      *
-     * @return $this
-     *
      * @phpstan-return static
      */
     public function withErrors(): self
@@ -238,8 +215,6 @@ final class OperationBuilder extends Builder
      * Scope query to operations without errors.
      *
      * Filters operations that have no associated error records.
-     *
-     * @return $this
      *
      * @phpstan-return static
      */
@@ -254,8 +229,6 @@ final class OperationBuilder extends Builder
      * Filters operations that completed successfully (either completed or skipped)
      * without being rolled back or failed. Skipped operations are considered
      * successful because the decision to skip was intentional and valid.
-     *
-     * @return $this
      *
      * @phpstan-return static
      */
@@ -274,8 +247,7 @@ final class OperationBuilder extends Builder
      *
      * Orders operations by their execution timestamp.
      *
-     * @param  string $direction Sort direction ('asc' or 'desc')
-     * @return $this
+     * @param string $direction Sort direction ('asc' or 'desc')
      *
      * @phpstan-return static
      */
@@ -292,8 +264,7 @@ final class OperationBuilder extends Builder
      * default latest() behavior to always sort by executed_at instead of
      * created_at, providing consistent operation timeline ordering.
      *
-     * @param  null|string $column Ignored - operations always ordered by executed_at
-     * @return $this
+     * @param null|string $column Ignored - operations always ordered by executed_at
      *
      * @phpstan-return $this
      */
@@ -311,8 +282,7 @@ final class OperationBuilder extends Builder
      * default oldest() behavior to always sort by executed_at instead of
      * created_at, providing consistent operation timeline ordering.
      *
-     * @param  null|string $column Ignored - operations always ordered by executed_at
-     * @return $this
+     * @param null|string $column Ignored - operations always ordered by executed_at
      *
      * @phpstan-return $this
      */

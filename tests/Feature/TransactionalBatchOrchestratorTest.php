@@ -575,8 +575,8 @@ PHP;
             expect($record3->rolled_back_at)->not->toBeNull();
 
             // Verify most recent was rolled back first (reverse chronological order)
-            expect($record3->rolled_back_at->gte($record2->rolled_back_at))->toBeTrue();
-            expect($record2->rolled_back_at->gte($record1->rolled_back_at))->toBeTrue();
+            expect($record3->rolled_back_at->lte($record2->rolled_back_at))->toBeTrue();
+            expect($record2->rolled_back_at->lte($record1->rolled_back_at))->toBeTrue();
 
             // Verify rollback was called on fixture operations
             expect(RollbackableWithDatabaseOperation::$rollbackCount)->toBe(3);

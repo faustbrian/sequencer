@@ -9,6 +9,7 @@
 
 use Cline\Sequencer\Commands\ExecuteCommand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -25,32 +26,21 @@ covers(ExecuteCommand::class);
 
 describe('Execute Command', function (): void {
     beforeEach(function (): void {
-        // Configure discovery paths to include test fixtures
-        config()->set('sequencer.execution.discovery_paths', [
-            __DIR__.'/../Fixtures/Operations',
-        ]);
-
-        // Track created files for cleanup
-        $this->createdFiles = [];
+        // Writable discovery fixtures belong to this test, not parallel workers.
+        $this->operationFixturePath = sys_get_temp_dir().'/sequencer-execute-'.bin2hex(random_bytes(8));
+        File::makeDirectory($this->operationFixturePath);
+        config()->set('sequencer.execution.discovery_paths', [$this->operationFixturePath]);
     });
 
     afterEach(function (): void {
-        // Clean up any created files
-        foreach ($this->createdFiles ?? [] as $file) {
-            if (!file_exists($file)) {
-                continue;
-            }
-
-            unlink($file);
-        }
+        File::deleteDirectory($this->operationFixturePath);
     });
 
     describe('Happy Paths', function (): void {
         test('executes single operation by timestamp successfully', function (): void {
             // Arrange
-            $operationPath = __DIR__.'/../Fixtures/Operations/2024_01_01_120000_TestOperation.php';
+            $operationPath = $this->operationFixturePath.'/2024_01_01_120000_TestOperation.php';
             file_put_contents($operationPath, "<?php\nreturn new class implements \\Cline\\Sequencer\\Contracts\\Operation {\n    public function handle(): void {}\n};");
-            $this->createdFiles[] = $operationPath;
 
             // Act & Assert
             $this->artisan('sequencer:execute', [
@@ -63,7 +53,7 @@ describe('Execute Command', function (): void {
 
         test('executes operation with sync flag', function (): void {
             // Arrange
-            $operationPath = __DIR__.'/../Fixtures/Operations/2024_01_02_120000_SyncOperation.php';
+            $operationPath = $this->operationFixturePath.'/2024_01_02_120000_SyncOperation.php';
             file_put_contents($operationPath, "<?php\nreturn new class implements \\Cline\\Sequencer\\Contracts\\Operation {\n    public function handle(): void {}\n};");
 
             // Act
@@ -76,17 +66,14 @@ describe('Execute Command', function (): void {
             $result->assertSuccessful();
             $result->expectsOutput('Mode: Synchronous (forced)');
             $result->expectsOutput('Operation executed successfully.');
-
-            $this->createdFiles[] = $operationPath;
         })->group('happy-path', 'command');
 
         test('executes operation with async flag', function (): void {
             // Arrange
             Queue::fake();
 
-            $operationPath = __DIR__.'/../Fixtures/Operations/2024_01_03_120000_AsyncOperation.php';
+            $operationPath = $this->operationFixturePath.'/2024_01_03_120000_AsyncOperation.php';
             file_put_contents($operationPath, "<?php\nreturn new class implements \\Cline\\Sequencer\\Contracts\\Operation {\n    public function handle(): void {}\n};");
-            $this->createdFiles[] = $operationPath;
 
             // Act & Assert
             $this->artisan('sequencer:execute', [
@@ -101,9 +88,8 @@ describe('Execute Command', function (): void {
             // Arrange
             Queue::fake();
 
-            $operationPath = __DIR__.'/../Fixtures/Operations/2024_01_04_120000_QueueOperation.php';
+            $operationPath = $this->operationFixturePath.'/2024_01_04_120000_QueueOperation.php';
             file_put_contents($operationPath, "<?php\nreturn new class implements \\Cline\\Sequencer\\Contracts\\Operation {\n    public function handle(): void {}\n};");
-            $this->createdFiles[] = $operationPath;
 
             // Act & Assert
             $this->artisan('sequencer:execute', [
@@ -117,7 +103,7 @@ describe('Execute Command', function (): void {
 
         test('executes operation without database record', function (): void {
             // Arrange
-            $operationPath = __DIR__.'/../Fixtures/Operations/2024_01_05_120000_NoRecordOperation.php';
+            $operationPath = $this->operationFixturePath.'/2024_01_05_120000_NoRecordOperation.php';
             file_put_contents($operationPath, "<?php\nreturn new class implements \\Cline\\Sequencer\\Contracts\\Operation {\n    public function handle(): void {}\n};");
 
             // Act
@@ -130,15 +116,13 @@ describe('Execute Command', function (): void {
             $result->assertSuccessful();
             $result->expectsOutput('Recording: Disabled');
             $result->expectsOutput('Operation executed successfully.');
-
-            $this->createdFiles[] = $operationPath;
         })->group('happy-path', 'command');
     });
 
     describe('Sad Paths', function (): void {
         test('fails when both sync and async flags are provided', function (): void {
             // Arrange
-            $operationPath = __DIR__.'/../Fixtures/Operations/2024_01_06_120000_ConflictOperation.php';
+            $operationPath = $this->operationFixturePath.'/2024_01_06_120000_ConflictOperation.php';
             file_put_contents($operationPath, "<?php\nreturn new class implements \\Cline\\Sequencer\\Contracts\\Operation {\n    public function handle(): void {}\n};");
 
             // Act
@@ -151,8 +135,6 @@ describe('Execute Command', function (): void {
             // Assert
             $result->assertFailed();
             $result->expectsOutput('Cannot use --sync and --async together');
-
-            $this->createdFiles[] = $operationPath;
         })->group('sad-path', 'command');
 
         test('fails when operation does not exist', function (): void {
@@ -171,7 +153,7 @@ describe('Execute Command', function (): void {
 
         test('warns when queue specified without async mode', function (): void {
             // Arrange
-            $operationPath = __DIR__.'/../Fixtures/Operations/2024_01_08_120000_QueueWithoutAsyncOperation.php';
+            $operationPath = $this->operationFixturePath.'/2024_01_08_120000_QueueWithoutAsyncOperation.php';
             file_put_contents($operationPath, "<?php\nreturn new class implements \\Cline\\Sequencer\\Contracts\\Operation {\n    public function handle(): void {}\n};");
 
             // Act
@@ -183,8 +165,6 @@ describe('Execute Command', function (): void {
             // Assert
             $result->assertSuccessful();
             $result->expectsOutput('Queue specified but not in async mode. Use --async to dispatch to queue.');
-
-            $this->createdFiles[] = $operationPath;
         })->group('sad-path', 'command');
 
         test('displays stack trace in verbose mode when operation fails', function (): void {

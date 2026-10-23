@@ -88,6 +88,7 @@ final class OperationDiscovery
             if (in_array($operation['name'], $inFlight, true)) {
                 continue;
             }
+
             $pending[] = $operation;
         }
 

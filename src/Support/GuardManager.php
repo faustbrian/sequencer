@@ -62,7 +62,7 @@ final class GuardManager
      */
     public function isAllowed(): bool
     {
-        return array_all($this->getGuards(), fn ($guard): bool => $guard->shouldExecute());
+        return array_all($this->getGuards(), fn (ExecutionGuard $guard): bool => $guard->shouldExecute());
     }
 
     /**

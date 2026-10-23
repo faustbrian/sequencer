@@ -11,6 +11,7 @@ use Cline\Sequencer\Commands\ProcessCommand;
 use Illuminate\Console\Command;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
 
 /**
  * ProcessCommand Coverage Test Suite
@@ -54,7 +55,7 @@ PHP;
             expect(Artisan::output())->toContain('FAILED');
 
             // Cleanup
-            array_map(unlink(...), glob($tempDir.'/*'));
+            array_map(File::delete(...), glob($tempDir.'/*'));
             rmdir($tempDir);
         })->group('sad-path', 'exception-handling');
 
@@ -90,7 +91,7 @@ PHP;
             expect(Artisan::output())->toContain('Verbose exception test');
 
             // Cleanup
-            array_map(unlink(...), glob($tempDir.'/*'));
+            array_map(File::delete(...), glob($tempDir.'/*'));
             rmdir($tempDir);
         })->group('sad-path', 'verbose-output');
 
@@ -123,7 +124,7 @@ PHP;
                 ->and($exitCode)->toBe(1);
 
             // Cleanup
-            array_map(unlink(...), glob($tempDir.'/*'));
+            array_map(File::delete(...), glob($tempDir.'/*'));
             rmdir($tempDir);
         })->group('sad-path', 'exception-handling');
     });
@@ -174,7 +175,7 @@ PHP;
             expect($output)->toContain('Operation'); // Type column value (capitalized)
 
             // Cleanup
-            array_map(unlink(...), glob($tempDir.'/*'));
+            array_map(File::delete(...), glob($tempDir.'/*'));
             rmdir($tempDir);
         })->group('happy-path', 'dry-run');
 
@@ -211,7 +212,7 @@ PHP;
             expect($output)->toContain('Found 1 pending task');
 
             // Cleanup
-            array_map(unlink(...), glob($tempDir.'/*'));
+            array_map(File::delete(...), glob($tempDir.'/*'));
             rmdir($tempDir);
         })->group('happy-path', 'dry-run');
 
@@ -249,7 +250,7 @@ PHP;
             expect($output)->toContain('TaskFieldsOperation'); // name
 
             // Cleanup
-            array_map(unlink(...), glob($tempDir.'/*'));
+            array_map(File::delete(...), glob($tempDir.'/*'));
             rmdir($tempDir);
         })->group('happy-path', 'dry-run');
     });

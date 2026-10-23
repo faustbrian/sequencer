@@ -255,7 +255,7 @@ test('database integration with real queries', function (): void {
         'state' => OperationState::Completed,
     ]);
 
-    // Create one executed but not completed (should not be in executed list)
+    // An already-queued operation is in flight, not eligible for redispatch.
     Operation::query()->create([
         'name' => '2024_01_16_130000_AddEmailColumn',
         'type' => 'sync',
@@ -274,8 +274,7 @@ test('database integration with real queries', function (): void {
     $result = $this->discovery->getPending();
 
     // Assert
-    expect($result)->toHaveCount(1);
-    expect($result[0]['class'])->toContain('AddEmailColumn.php');
+    expect($result)->toBe([]);
 })->group('integration');
 test('filesystem integration with real files', function (): void {
     // Arrange

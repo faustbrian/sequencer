@@ -253,6 +253,6 @@ final readonly class DependencyResolver
             return $data['class'];
         }, $sorted);
 
-        return array_all($dependencies, fn ($dependency): bool => in_array($dependency, $sortedNames, true));
+        return array_all($dependencies, fn (string $dependency): bool => in_array($dependency, $sortedNames, true));
     }
 }

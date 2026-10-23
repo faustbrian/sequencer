@@ -23,7 +23,8 @@ final class ProcessDeferredCommand extends Command
     /** @var string */
     #[Override()]
     protected $signature = 'sequencer:deferred-process
-                            {--limit=100 : Maximum number of deferred operations to process}';
+                            {--limit=100 : Maximum number of deferred operations to process}
+                            {--operation=* : Only process these stored operation identifiers}';
 
     /** @var string */
     #[Override()]
@@ -38,7 +39,10 @@ final class ProcessDeferredCommand extends Command
     public function handle(): int
     {
         $limit = (int) $this->option('limit');
-        $stats = $this->processor->processDue($limit);
+
+        /** @var list<string> $operations */
+        $operations = $this->option('operation');
+        $stats = $this->processor->processDue($limit, $operations === [] ? null : $operations);
 
         $this->components->info(sprintf('Processed %d deferred operation(s).', $stats['processed']));
 

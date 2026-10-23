@@ -18,12 +18,14 @@ use Illuminate\Support\Facades\Config;
 use Override;
 
 /**
+ * @property int $attempts
+ *
  * @author Brian Faust <brian@cline.sh>
  *
- * @property int                       $attempts
  * @property int                       $max_attempts
  * @property string                    $operation
  * @property null|array<string, mixed> $payload
+ * @property DeferredOperationStatus   $status
  */
 final class DeferredOperation extends Model
 {
