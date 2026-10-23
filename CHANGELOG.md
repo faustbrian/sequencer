@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release
 
 ### Fixed
+- Preserve unrestricted processing for programmatic non-array tag options.
+  Cover exact erasure opt-in isolation for both successful and failed operations.
 - Keep worker-concurrency formatting consistent when pcntl constants are present,
   cover recovery of persisted claims without reservation timestamps, and isolate
   command discovery inputs from parallel test workers.

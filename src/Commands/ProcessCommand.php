@@ -17,6 +17,7 @@ use Cline\Sequencer\SequentialOrchestrator;
 use Illuminate\Console\Command;
 use Illuminate\Database\Events\MigrationEnded;
 use Illuminate\Database\Events\MigrationStarted;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Event;
 use Override;
 use Throwable;
@@ -26,6 +27,7 @@ use function class_basename;
 use function count;
 use function hrtime;
 use function implode;
+use function is_array;
 use function is_string;
 use function number_format;
 use function preg_match;
@@ -155,7 +157,6 @@ final class ProcessCommand extends Command
         $queueOption = $this->option('queue');
         $queue = is_string($queueOption) ? $queueOption : null;
 
-        /** @var list<string> $tags */
         $tags = $this->option('tags');
 
         if ($sync && $async) {
@@ -192,8 +193,10 @@ final class ProcessCommand extends Command
             $this->info('Dispatching to queue: '.$queue);
         }
 
-        if ($tags !== []) {
-            $this->info('Filtering by tags: '.implode(', ', $tags));
+        // Symfony ArrayInput preserves programmatic non-array options;
+        // the orchestrator treats those as unrestricted tag selection.
+        if (is_array($tags) && $tags !== []) {
+            $this->info('Filtering by tags: '.Arr::join($tags, ', '));
         }
 
         $this->startTime = hrtime(true);

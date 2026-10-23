@@ -29,13 +29,15 @@ reservation becomes eligible again after `sequencer.deferred.retry_after_seconds
 (default 300, or `SEQUENCER_DEFERRED_RETRY_AFTER_SECONDS`). Set this above the
 longest handler execution time before enabling a processor. Reservations count
 as attempts, including interrupted attempts; an abandoned final attempt becomes
-`Failed` without executing again. Existing rows need no schema migration.
+`Failed` without executing again. Existing rows need no schema migration. Drain
+old-version deferred processors before starting upgraded consumers: only upgraded
+workers enforce replacement-claim ownership.
 
 Recovery is **at least once**, not exactly once: a handler can perform an external
 effect before its worker disappears. Handlers must tolerate replay. Expiry does
-not stop an old worker, but its later completion/failure cannot overwrite a
-replacement claim's state. Each invocation visits a record at most once, even
-when retry delay is zero; it leaves fresh reservations and terminal rows alone.
+not stop an expired worker running this version, but its later completion/failure
+cannot overwrite a replacement claim's state. Each invocation visits a record
+at most once, even when retry delay is zero; it leaves fresh reservations and terminal rows alone.
 Candidate keys are selected at invocation start; each reservation is rechecked
 and persisted just before its handler runs. Records becoming due or newly
 created during execution wait until the next invocation. A vetoed model save

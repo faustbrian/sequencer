@@ -120,11 +120,11 @@ test('a stale owner cannot overwrite its replacement disposition', function (boo
         ->and($row->fresh()->status)->toBe($oldFails ? DeferredOperationStatus::Completed : DeferredOperationStatus::Pending);
 })->with([true, false]);
 
-test('erases opted-in payloads only when processing becomes terminal', function (bool $fails, bool $erase): void {
+test('erases opted-in payloads only when processing becomes terminal', function (bool $fails, bool $erase, bool $otherOptIn = false): void {
     $alias = $fails ? 'unrelated' : 'selected';
     $payload = ['nested' => ['password' => 'distinctive-sensitive-value']];
     $row = resolve(SequencerManager::class)->defer($alias, $payload, Date::now(), maxAttempts: 2);
-    config()->set('sequencer.deferred.erase_payload_for', $erase ? [$alias] : []);
+    config()->set('sequencer.deferred.erase_payload_for', $erase ? [$alias] : ($otherOptIn ? ['other-operation'] : []));
     config()->set('sequencer.deferred.retry_delay_seconds', 0);
 
     resolve(DeferredOperationProcessor::class)->processDue(1);
@@ -141,7 +141,7 @@ test('erases opted-in payloads only when processing becomes terminal', function 
     expect($row->fresh()->payload)->toBe($erase ? [] : $payload)
         ->and(str_contains((string) $raw, 'distinctive-sensitive-value'))->toBe(!$erase)
         ->and($row->fresh()->status)->toBe($fails ? DeferredOperationStatus::Failed : DeferredOperationStatus::Completed);
-})->with([[false, true], [false, false], [true, true], [true, false]]);
+})->with([[false, true], [false, false], [true, true], [true, false], [false, false, true], [true, false, true]]);
 
 test('restricted consumption preserves exact alias identity under case-insensitive collation', function (bool $expired): void {
     config()->set('sequencer.deferred.taskMap', [

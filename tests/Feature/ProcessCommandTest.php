@@ -8,6 +8,8 @@
  */
 
 use Cline\Sequencer\Commands\ProcessCommand;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 
 /**
@@ -140,6 +142,14 @@ describe('Process Command', function (): void {
     });
 
     describe('Edge Cases', function (): void {
+        test('preserves unrestricted processing for programmatic non-array tag options', function (mixed $tags): void {
+            $path = $this->operationFixturePath.'/2024_01_01_120000_NonArrayTagsOperation.php';
+            file_put_contents($path, '<?php return new class implements \Cline\Sequencer\Contracts\Operation { public function handle(): void { '.Cache::class.'::put("non-array-tags-executed", true); } };');
+
+            expect(Artisan::call('sequencer:process', ['--tags' => $tags]))->toBe(0);
+            expect(Cache::get('non-array-tags-executed'))->toBeTrue();
+            expect(Artisan::output())->not->toContain('Filtering by tags:');
+        })->with([[null], ['billing'], [true], [false], [7], [7.5], [new stdClass()]]);
         test('executes with valid timestamp format in far future', function (): void {
             // Arrange
             $timestamp = '2099_12_31_235959';
