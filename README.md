@@ -49,6 +49,10 @@ option the command still processes all eligible identifiers. Programmatic
 the same selection; `null` means unrestricted and `[]` means no work. Blank
 identifiers are rejected. Select the persisted alias, not its mapped class name.
 Schedule restricted commands separately when environments require different work.
+Exact selection supports SQLite, MySQL/MariaDB, PostgreSQL and SQL Server,
+independently of their default collation. A custom unsupported database driver
+rejects restricted consumption instead of broadening it; unrestricted processing
+is unchanged.
 
 Set `sequencer.deferred.erase_payload_for` to a list of exact stored identifiers
 whose inputs should not remain in history. The processor replaces their payload

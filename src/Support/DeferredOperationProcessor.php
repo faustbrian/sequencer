@@ -19,7 +19,10 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Throwable;
 
+use function array_fill;
 use function config;
+use function count;
+use function implode;
 use function in_array;
 use function is_array;
 use function mb_trim;
@@ -92,7 +95,7 @@ final readonly class DeferredOperationProcessor
                 $payload = is_array($operationRecord->payload) ? $operationRecord->payload : [];
                 $operation->handle($payload);
 
-                $updated = $this->ownedClaim($operationRecord)->update([
+                $updated = $this->updateOwnedClaim($operationRecord, [
                     'status' => DeferredOperationStatus::Completed,
                     'processed_at' => Date::now(),
                     'reserved_at' => null,
@@ -120,7 +123,7 @@ final readonly class DeferredOperationProcessor
             $query->whereNotIn('id', $handled);
 
             if ($operations !== null) {
-                $query->whereIn('operation', $operations);
+                $this->restrictOperations($query, $operations);
             }
 
             /** @var null|DeferredOperation $record */
@@ -179,6 +182,47 @@ final readonly class DeferredOperationProcessor
     }
 
     /**
+     * @param array<string, mixed> $attributes
+     */
+    private function updateOwnedClaim(DeferredOperation $record, array $attributes): int
+    {
+        return DB::connection()->transaction(function () use ($record, $attributes): int {
+            /** @var null|DeferredOperation $current */
+            $current = $this->ownedClaim($record)->lockForUpdate()->first();
+
+            // Preserve model serialization and lifecycle events. The locked
+            // ownership predicate fences an expired handler before Model::update.
+            return $current !== null && $current->update($attributes) ? 1 : 0;
+        });
+    }
+
+    /**
+     * @param Builder<DeferredOperation> $query
+     * @param list<string>               $operations
+     */
+    private function restrictOperations(Builder $query, array $operations): void
+    {
+        // Keep the ordinary indexed prefilter, then enforce the registry's exact
+        // identity before claiming/limiting. Default DB collations can fold case,
+        // accents or trailing spaces; a binary collation alone can still pad.
+        $query->whereIn('operation', $operations);
+
+        if ($operations === []) {
+            return;
+        }
+
+        $column = $query->getQuery()->getGrammar()->wrap('operation');
+        [$expression, $placeholder] = match ($query->getModel()->getConnection()->getDriverName()) {
+            'mysql', 'mariadb' => ["CAST({$column} AS BINARY)", 'CAST(? AS BINARY)'],
+            'pgsql' => ["{$column} COLLATE \"C\"", '?'],
+            'sqlite' => ["{$column} COLLATE BINARY", '?'],
+            'sqlsrv' => ["CONVERT(VARBINARY(MAX), CAST({$column} AS NVARCHAR(MAX)))", 'CONVERT(VARBINARY(MAX), CAST(? AS NVARCHAR(MAX)))'],
+            default => throw new InvalidArgumentException('Exact deferred selection is unsupported for this database driver.'),
+        };
+        $query->whereRaw($expression.' IN ('.implode(', ', array_fill(0, count($operations), $placeholder)).')', $operations);
+    }
+
+    /**
      * @return array{payload: array{}}|array{}
      */
     private function terminalPayload(DeferredOperation $record): array
@@ -196,7 +240,7 @@ final readonly class DeferredOperationProcessor
     private function handleFailure(DeferredOperation $record, Throwable $throwable, array &$stats): void
     {
         if ($record->attempts >= $record->max_attempts) {
-            $updated = $this->ownedClaim($record)->update([
+            $updated = $this->updateOwnedClaim($record, [
                 'status' => DeferredOperationStatus::Failed,
                 'failed_at' => Date::now(),
                 'reserved_at' => null,
@@ -212,7 +256,7 @@ final readonly class DeferredOperationProcessor
         /** @var int $retryDelaySeconds */
         $retryDelaySeconds = config('sequencer.deferred.retry_delay_seconds', 60);
 
-        $updated = $this->ownedClaim($record)->update([
+        $updated = $this->updateOwnedClaim($record, [
             'status' => DeferredOperationStatus::Pending,
             'reserved_at' => null,
             'last_error' => $throwable->getMessage(),

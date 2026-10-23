@@ -7,14 +7,18 @@
  * file that was distributed with this source code.
  */
 
+use Cline\Sequencer\Database\Models\DeferredOperation;
 use Cline\Sequencer\Enums\DeferredOperationStatus;
 use Cline\Sequencer\SequencerManager;
 use Cline\Sequencer\Support\DeferredOperationProcessor;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\Fixtures\DeferredOperations\CallbackDeferredOperation;
 use Tests\Fixtures\DeferredOperations\FailingDeferredOperation;
 use Tests\Fixtures\DeferredOperations\HelpNewOrganizationEmailOperation;
+use Tests\Fixtures\DeferredOperations\SqlServerUpdateGrammar;
 
 beforeEach(function (): void {
     Date::setTestNow('2026-10-23 12:00:00');
@@ -138,3 +142,71 @@ test('erases opted-in payloads only when processing becomes terminal', function 
         ->and(str_contains((string) $raw, 'distinctive-sensitive-value'))->toBe(!$erase)
         ->and($row->fresh()->status)->toBe($fails ? DeferredOperationStatus::Failed : DeferredOperationStatus::Completed);
 })->with([[false, true], [false, false], [true, true], [true, false]]);
+
+test('restricted consumption preserves exact alias identity under case-insensitive collation', function (bool $expired): void {
+    config()->set('sequencer.deferred.taskMap', [
+        'selected' => HelpNewOrganizationEmailOperation::class,
+        'SELECTED' => FailingDeferredOperation::class,
+    ]);
+    $table = new DeferredOperation()->getTable();
+    Schema::table($table, function (Blueprint $table): void {
+        $collation = DB::connection()->getDriverName() === 'mysql' ? 'utf8mb4_unicode_ci' : 'NOCASE';
+        $table->string('operation')->collation($collation)->change();
+    });
+    $excluded = resolve(SequencerManager::class)->defer('SELECTED', ['excluded' => true], Date::now()->subMinutes(2));
+
+    if ($expired) {
+        $excluded->update(['status' => DeferredOperationStatus::Processing, 'attempts' => 1, 'reserved_at' => Date::now()->subMinutes(8)]);
+    }
+
+    $snapshot = $excluded->fresh()->getRawOriginal();
+    $selected = resolve(SequencerManager::class)->defer('selected', [], Date::now()->subMinute());
+
+    resolve(DeferredOperationProcessor::class)->processDue(1, ['selected']);
+
+    expect($selected->fresh()->status)->toBe(DeferredOperationStatus::Completed)
+        ->and($excluded->fresh()->getRawOriginal())->toBe($snapshot)
+        ->and(FailingDeferredOperation::$attempts)->toBe(0);
+})->with([false, true]);
+
+test('serializes erased payloads for SQL Server terminal writes', function (bool $fails): void {
+    $alias = $fails ? 'unrelated' : 'selected';
+    config()->set('sequencer.deferred.erase_payload_for', [$alias]);
+    $row = resolve(SequencerManager::class)->defer($alias, ['secret' => 'erase this'], Date::now(), maxAttempts: 1);
+    $connection = DB::connection();
+    $original = $connection->getQueryGrammar();
+    $connection->setQueryGrammar(
+        new SqlServerUpdateGrammar($connection),
+    );
+
+    try {
+        resolve(DeferredOperationProcessor::class)->processDue(1);
+    } finally {
+        $connection->setQueryGrammar($original);
+    }
+
+    expect($row->fresh()->status)->toBe($fails ? DeferredOperationStatus::Failed : DeferredOperationStatus::Completed)
+        ->and($row->fresh()->payload)->toBe([]);
+})->with([false, true]);
+
+test('preserves model lifecycle notifications for terminal and retry dispositions', function (bool $fails): void {
+    $alias = $fails ? 'unrelated' : 'selected';
+    $states = [];
+    DeferredOperation::updated(function (DeferredOperation $row) use (&$states): void {
+        $states[] = $row->status->value;
+    });
+    resolve(SequencerManager::class)->defer($alias, [], Date::now(), maxAttempts: 2);
+    config()->set('sequencer.deferred.retry_delay_seconds', 0);
+
+    try {
+        resolve(DeferredOperationProcessor::class)->processDue(1);
+
+        if ($fails) {
+            resolve(DeferredOperationProcessor::class)->processDue(1);
+        }
+    } finally {
+        DeferredOperation::flushEventListeners();
+    }
+
+    expect($states)->toBe($fails ? ['processing', 'pending', 'processing', 'failed'] : ['processing', 'completed']);
+})->with([false, true]);
