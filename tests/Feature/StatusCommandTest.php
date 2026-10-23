@@ -32,8 +32,12 @@ describe('Status Command', function (): void {
     describe('Happy Paths', function (): void {
         test('displays no pending items when none exist', function (): void {
             // Arrange
-            // Mark all discovered timestamped operations as completed so they don't appear as pending
-            $operationFiles = glob(__DIR__.'/../Fixtures/Operations/[0-9][0-9][0-9][0-9]_*.php');
+            // Other parallel tests create timestamped files in Operations. Use
+            // immutable discovered fixtures so completion and discovery agree.
+            $fixturePath = __DIR__.'/../Fixtures/PendingOperations';
+            config()->set('sequencer.execution.discovery_paths', [$fixturePath]);
+            $operationFiles = glob($fixturePath.'/[0-9][0-9][0-9][0-9]_*.php');
+            expect($operationFiles)->toHaveCount(2);
 
             foreach ($operationFiles as $file) {
                 Operation::factory()->create([

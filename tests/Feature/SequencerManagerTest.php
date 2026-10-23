@@ -22,6 +22,12 @@ use Tests\Fixtures\Operations\BasicOperation;
 use Tests\Fixtures\Operations\ConditionalOperation;
 use Tests\Fixtures\Operations\RollbackableOperation;
 
+beforeEach(function (): void {
+    // These direct file/class API tests do not own command-generated files
+    // created in database/operations by parallel make-command tests.
+    config()->set('sequencer.execution.discovery_paths', []);
+});
+
 test('executeIf executes operation when condition is true', function (): void {
     $operation = __DIR__.'/../Support/TestOperations/2024_01_01_000001_basic_operation.php';
 
