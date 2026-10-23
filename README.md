@@ -21,6 +21,43 @@ composer require cline/sequencer
 
 Create an operation, implement the `handle()` method, and execute sequentially with `php artisan sequencer:process`. See [Getting Started](DOCS.md#doc-docs-readme) for detailed examples.
 
+## Deferred application work
+
+`sequencer:deferred-process --limit=100` processes due intents stored by
+`Sequencer::defer()`. It claims one record immediately before execution. A lost
+reservation becomes eligible again after `sequencer.deferred.retry_after_seconds`
+(default 300, or `SEQUENCER_DEFERRED_RETRY_AFTER_SECONDS`). Set this above the
+longest handler execution time before enabling a processor. Reservations count
+as attempts, including interrupted attempts; an abandoned final attempt becomes
+`Failed` without executing again. Existing rows need no schema migration.
+
+Recovery is **at least once**, not exactly once: a handler can perform an external
+effect before its worker disappears. Handlers must tolerate replay. Expiry does
+not stop an old worker, but its later completion/failure cannot overwrite a
+replacement claim's state. Each invocation visits a record at most once, even
+when retry delay is zero; it leaves fresh reservations and terminal rows alone.
+
+To consume only selected work, repeat the option with exact stored identifiers:
+
+```bash
+php artisan sequencer:deferred-process --operation=registration_credentials --operation=registered_user_shipping_methods
+```
+
+Unselected rows remain unchanged, including expired reservations. Without an
+option the command still processes all eligible identifiers. Programmatic
+`DeferredOperationProcessor::processDue(100, ['registration_credentials'])` uses
+the same selection; `null` means unrestricted and `[]` means no work. Blank
+identifiers are rejected. Select the persisted alias, not its mapped class name.
+Schedule restricted commands separately when environments require different work.
+
+Set `sequencer.deferred.erase_payload_for` to a list of exact stored identifiers
+whose inputs should not remain in history. The processor replaces their payload
+with `[]` on `Completed` (including a handler's successful no-op) or `Failed`.
+Retryable attempts retain inputs; other identifiers retain their normal payloads.
+This does not scrub handler error messages, logs, existing terminal history or
+caller-written `Cancelled` records. Account erasure/cancellation must clear those
+records at the application lifecycle boundary.
+
 ## Documentation
 
 - **[Getting Started](DOCS.md#doc-docs-readme)** - Installation, configuration, and first operation

@@ -24,6 +24,7 @@ use Override;
  * @property int                       $max_attempts
  * @property string                    $operation
  * @property null|array<string, mixed> $payload
+ * @property DeferredOperationStatus   $status
  */
 final class DeferredOperation extends Model
 {
