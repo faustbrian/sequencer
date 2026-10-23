@@ -28,12 +28,15 @@ use Cline\Sequencer\Events\OperationStarted;
 use Cline\Sequencer\Exceptions\SkipOperationException;
 use DateTimeInterface;
 use Illuminate\Bus\Batchable;
+use Illuminate\Bus\Queueable;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted as LaravelShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldBeUnique as LaravelShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -74,7 +77,10 @@ use function str_starts_with;
 final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldBeUnique, ShouldQueue
 {
     use Batchable;
+    use Dispatchable;
+    use InteractsWithQueue;
     use Queueable;
+    use SerializesModels;
 
     /**
      * The number of times the job may be attempted.

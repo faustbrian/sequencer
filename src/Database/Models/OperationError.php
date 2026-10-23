@@ -79,6 +79,17 @@ final class OperationError extends Model
     ];
 
     /**
+     * Attribute casting configuration.
+     *
+     * @var array<string, string>
+     */
+    #[Override()]
+    protected $casts = [
+        'context' => 'array',
+        'created_at' => 'datetime',
+    ];
+
+    /**
      * Get the table name from configuration.
      *
      * Retrieves the configured table name from sequencer.table_names.operation_errors,
@@ -109,18 +120,5 @@ final class OperationError extends Model
         $operationModel = Config::get('sequencer.models.operation', Operation::class);
 
         return $this->belongsTo($operationModel, 'operation_id');
-    }
-
-    /**
-     * Attribute casting configuration.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
-    {
-        return [
-            'context' => 'array',
-            'created_at' => 'datetime',
-        ];
     }
 }

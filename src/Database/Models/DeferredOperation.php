@@ -18,9 +18,10 @@ use Illuminate\Support\Facades\Config;
 use Override;
 
 /**
+ * @property int $attempts
+ *
  * @author Brian Faust <brian@cline.sh>
  *
- * @property int                       $attempts
  * @property int                       $max_attempts
  * @property string                    $operation
  * @property null|array<string, mixed> $payload
@@ -47,25 +48,21 @@ final class DeferredOperation extends Model
         'last_error',
     ];
 
+    /** @var array<string, string> */
+    #[Override()]
+    protected $casts = [
+        'payload' => 'array',
+        'due_at' => 'datetime',
+        'reserved_at' => 'datetime',
+        'processed_at' => 'datetime',
+        'failed_at' => 'datetime',
+        'status' => DeferredOperationStatus::class,
+    ];
+
     #[Override()]
     public function getTable(): string
     {
         /** @var string */
         return Config::get('sequencer.table_names.deferred_operations', 'deferred_operations');
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    protected function casts(): array
-    {
-        return [
-            'payload' => 'array',
-            'due_at' => 'datetime',
-            'reserved_at' => 'datetime',
-            'processed_at' => 'datetime',
-            'failed_at' => 'datetime',
-            'status' => DeferredOperationStatus::class,
-        ];
     }
 }
