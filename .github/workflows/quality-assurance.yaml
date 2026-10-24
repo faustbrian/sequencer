@@ -20,6 +20,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: pcov
+          extensions: pcntl, posix
           tools: composer:v2
       - name: Install dependencies
         run: composer install --no-progress ${{ matrix.composer-flags }}

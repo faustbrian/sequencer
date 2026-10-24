@@ -1,0 +1,31 @@
+<?php declare(strict_types=1);
+
+use Cline\Sequencer\SequencerServiceProvider;
+use Cline\VariableKeys\VariableKeysServiceProvider;
+use Orchestra\Testbench\Foundation\Application;
+use Symfony\Component\Console\Input\ArgvInput;
+use Tests\Fixtures\DeferredBound\ProbeOperation;
+
+require dirname(__DIR__, 3).'/vendor/autoload.php';
+$app = Application::create(options: [
+    'extra' => [
+        'providers' => [VariableKeysServiceProvider::class, SequencerServiceProvider::class],
+        'env' => ['APP_ENV=testing', 'SEQUENCER_PRIMARY_KEY_TYPE='.(getenv('BOUND_PRIMARY_KEY_TYPE') ?: 'id')],
+    ],
+]);
+config()->set('database.default', 'sqlite');
+config()->set('database.connections.sqlite.database', getenv('BOUND_DATABASE'));
+config()->set('sequencer.deferred.enforceTaskMap', ['bound_probe' => ProbeOperation::class, 'bound_other' => ProbeOperation::class]);
+config()->set('sequencer.deferred.retry_after_seconds', (int) (getenv('BOUND_PROBE_EXPIRY') ?: 300));
+config()->set('sequencer.deferred.runtime', [
+    'enabled' => true, 'timeout_seconds' => 20, 'kill_after_seconds' => 2,
+    'recovery_margin_seconds' => 1, 'timeout_binary' => getenv('BOUND_TIMEOUT_BINARY') ?: '/usr/bin/timeout',
+]);
+if (getenv('BOUND_BUILD_CONFIG_CACHE') && !is_file($app->getCachedConfigPath())) {
+    file_put_contents($app->getCachedConfigPath(), '<?php return '.var_export(config()->all(), true).';');
+}
+$artisan = new Illuminate\Console\Application($app, $app->make('events'), 'testing');
+$artisan->resolveCommands([Cline\Sequencer\Commands\ProcessDeferredCommand::class]);
+$artisan->setAutoExit(false);
+$artisan->setCatchExceptions(true);
+exit($artisan->run(new ArgvInput()));

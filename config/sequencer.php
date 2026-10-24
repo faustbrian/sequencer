@@ -306,6 +306,26 @@ return [
         // recovery of a lost worker; handlers must tolerate repeated effects.
         'retry_after_seconds' => env('SEQUENCER_DEFERRED_RETRY_AFTER_SECONDS', 300),
 
+        /*
+        |--------------------------------------------------------------------------
+        | Deferred Command Runtime
+        |--------------------------------------------------------------------------
+        |
+        | Opt in to external CLI containment on Unix hosts with PCNTL, POSIX
+        | and GNU timeout. Disabled mode retains programmatic command usage.
+        | Timeout plus kill grace and recovery margin must fit within the
+        | reservation expiry. This bounds the whole run, not queued jobs.
+        |
+        */
+
+        'runtime' => [
+            'enabled' => env('SEQUENCER_DEFERRED_RUNTIME_ENABLED', false),
+            'timeout_seconds' => env('SEQUENCER_DEFERRED_RUNTIME_TIMEOUT_SECONDS', 240),
+            'kill_after_seconds' => env('SEQUENCER_DEFERRED_RUNTIME_KILL_AFTER_SECONDS', 10),
+            'recovery_margin_seconds' => env('SEQUENCER_DEFERRED_RUNTIME_RECOVERY_MARGIN_SECONDS', 50),
+            'timeout_binary' => env('SEQUENCER_DEFERRED_RUNTIME_TIMEOUT_BINARY', '/usr/bin/timeout'),
+        ],
+
         // Exact stored identifiers whose payload is erased on Completed/Failed.
         // Retryable attempts retain inputs; cancellation/erasure is caller-owned.
         'erase_payload_for' => [],

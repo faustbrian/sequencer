@@ -27,6 +27,7 @@ use Cline\Sequencer\Exceptions\InvalidDeferredConfigurationException;
 use Cline\Sequencer\Observers\SequencerObserver;
 use Cline\Sequencer\Strategies\CommandStrategy;
 use Cline\Sequencer\Strategies\MigrationStrategy;
+use Cline\Sequencer\Support\DeferredProcessRuntime;
 use Cline\Sequencer\Support\GuardManager;
 use Cline\VariableKeys\Enums\PrimaryKeyType;
 use Cline\VariableKeys\Facades\VariableKeys;
@@ -96,6 +97,7 @@ final class SequencerServiceProvider extends PackageServiceProvider
         $this->app->singleton(SequencerManager::class);
 
         $this->app->singleton(GuardManager::class);
+        $this->app->singleton(DeferredProcessRuntime::class);
 
         $this->registerStrategies();
     }
