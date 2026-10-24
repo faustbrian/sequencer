@@ -9,7 +9,7 @@ A powerful Laravel package that orchestrates sequential execution of migrations 
 
 ## Requirements
 
-> **Requires [PHP 8.4+](https://php.net/releases/)** and Laravel 11+
+> **Requires [PHP 8.5+](https://php.net/releases/)** and Laravel 11+
 
 ## Installation
 
@@ -34,8 +34,8 @@ old-version deferred processors before starting upgraded consumers: only upgrade
 workers enforce replacement-claim ownership.
 
 Recovery is **at least once**, not exactly once: a handler can perform an external
-effect before its worker disappears. Handlers must tolerate replay. Expiry does
-not stop an expired worker running this version, but its later completion/failure
+effect before its worker disappears. Handlers must tolerate replay. Without runtime containment, expiry does
+not stop an expired worker, but its later completion/failure
 cannot overwrite a replacement claim's state. Each invocation visits a record
 at most once, even when retry delay is zero; it leaves fresh reservations and terminal rows alone.
 Candidate keys are selected at invocation start; each reservation is rechecked
@@ -67,6 +67,41 @@ Retryable attempts retain inputs; other identifiers retain their normal payloads
 This does not scrub handler error messages, logs, existing terminal history or
 caller-written `Cancelled` records. Account erasure/cancellation must clear those
 records at the application lifecycle boundary.
+
+### Optional bounded CLI runtime
+
+Enable `sequencer.deferred.runtime.enabled` (or
+`SEQUENCER_DEFERRED_RUNTIME_ENABLED=true`) to bound the **whole command run**,
+including blocking handler I/O. The default remains disabled, so existing
+programmatic calls and the command's concrete type and constructor are unchanged.
+When enabled, invoke the real external `php artisan sequencer:deferred-process`
+CLI; direct `handle()`, synthetic inputs and nested `Artisan::call()` are rejected
+before any claim. Repeatable `--operation`, `--limit` and global options are
+preserved across supervision.
+
+This opt-in mode requires Unix CLI PHP with PCNTL and POSIX, plus an executable
+**GNU coreutils `timeout`** (default `/usr/bin/timeout`). These are not new Composer
+platform requirements when the feature is disabled. Install the prerequisites on
+every consumer host/image and drain existing unbounded processors before enabling
+it. Publish/rebuild cached configuration as part of that rollout.
+
+| Runtime setting | Environment variable | Default |
+| --- | --- | --- |
+| `timeout_seconds` | `SEQUENCER_DEFERRED_RUNTIME_TIMEOUT_SECONDS` | 240 |
+| `kill_after_seconds` | `SEQUENCER_DEFERRED_RUNTIME_KILL_AFTER_SECONDS` | 10 |
+| `recovery_margin_seconds` | `SEQUENCER_DEFERRED_RUNTIME_RECOVERY_MARGIN_SECONDS` | 50 |
+| `timeout_binary` | `SEQUENCER_DEFERRED_RUNTIME_TIMEOUT_BINARY` | `/usr/bin/timeout` |
+
+All three durations must be positive integers and their sum must not exceed
+`deferred.retry_after_seconds`. With the defaults, expiry must be at least 300
+seconds. The supervisor sends TERM at the timeout and KILL after the grace period;
+an independent OS alarm also stops the PHP worker if its supervisor disappears.
+The budget is not renewed between handlers. Interrupted claims retain their
+existing retry/expiry behavior, and unclaimed work waits for another invocation.
+
+This does not bound direct `DeferredOperationProcessor::processDue()` calls or
+queued operation jobs. It also cannot undo an external effect accepted before a
+worker dies: replay is still at least once, so handlers must remain replay-safe.
 
 ## Documentation
 
