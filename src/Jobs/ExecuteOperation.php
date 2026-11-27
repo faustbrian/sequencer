@@ -38,6 +38,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -428,18 +429,33 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
      */
     public function failed(?Throwable $exception = null): void
     {
-        $record = OperationModel::query()->find($this->recordId);
+        $connection = OperationModel::query()->getConnection();
 
-        if (!$record instanceof OperationModel || $record->state !== OperationState::Pending) {
-            return;
+        // On timeout Laravel calls this from its alarm handler while handle()'s
+        // transaction is still open, then kills the worker. It rolls back only the
+        // failed-job log connection, so without this the Failed write would be
+        // lost with the transaction and the record would stay Pending.
+        if ($exception instanceof TimeoutExceededException && $connection->transactionLevel() > 0) {
+            $connection->rollBack(0);
         }
 
-        $record->update([
-            'failed_at' => Date::now(),
-            'state' => OperationState::Failed,
-        ]);
+        // Lock the row so a run that completes concurrently is not overwritten.
+        $record = $connection->transaction(function (): ?OperationModel {
+            $record = OperationModel::query()->lockForUpdate()->find($this->recordId);
 
-        if (!$exception instanceof Throwable) {
+            if (!$record instanceof OperationModel || $record->state !== OperationState::Pending) {
+                return null;
+            }
+
+            $record->update([
+                'failed_at' => Date::now(),
+                'state' => OperationState::Failed,
+            ]);
+
+            return $record;
+        });
+
+        if (!$record instanceof OperationModel || !$exception instanceof Throwable) {
             return;
         }
 
@@ -503,6 +519,10 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
 
         Queue::connection($this->job->getConnectionName())
             ->laterOn($this->job->getQueue(), $delay, $retry);
+
+        // The retry carries the rest of the chain. This job returns normally, so
+        // the queue would otherwise dispatch the next chained job now as well.
+        $this->chained = [];
     }
 
     /**

@@ -301,9 +301,11 @@ return [
         */
 
         'retry_delay_seconds' => env('SEQUENCER_DEFERRED_RETRY_DELAY_SECONDS', 60),
+
         // Must exceed the longest handler duration. Expiry permits at-least-once
         // recovery of a lost worker; handlers must tolerate repeated effects.
         'retry_after_seconds' => env('SEQUENCER_DEFERRED_RETRY_AFTER_SECONDS', 300),
+
         /*
         |--------------------------------------------------------------------------
         | Deferred Command Runtime
@@ -323,6 +325,7 @@ return [
             'recovery_margin_seconds' => env('SEQUENCER_DEFERRED_RUNTIME_RECOVERY_MARGIN_SECONDS', 50),
             'timeout_binary' => env('SEQUENCER_DEFERRED_RUNTIME_TIMEOUT_BINARY', '/usr/bin/timeout'),
         ],
+
         // Exact stored identifiers whose payload is erased on Completed/Failed.
         // Retryable attempts retain inputs; cancellation/erasure is caller-owned.
         'erase_payload_for' => [],

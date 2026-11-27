@@ -116,12 +116,14 @@ moves its record out of pending:
   job fails. Batched jobs are released instead and use up their tries.
 - When the queue gives up on a job (attempts exhausted, timeout, or a worker
   that died), `failed()` marks a still-pending record failed.
-- When pushing the job throws, the record is marked failed and the exception
-  is rethrown.
+- When `SequentialOrchestrator` fails to build or push the job, the record is
+  marked failed and the exception is rethrown.
 
 A failed record is offered again on the next `sequencer:process` run. A
 queued operation is not ordered against the migrations and operations after
-it, so nothing in the same run should depend on its result.
+it, so nothing in the same run should depend on its result. Queued execution
+is at least once: keep the queue's `retry_after` above the job timeout and make
+queued operations safe to run again.
 
 ## Documentation
 

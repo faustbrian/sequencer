@@ -8,16 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- Queued operations no longer stay pending forever, which made every later run
-  skip them. `ExecuteOperation::failed()` marks a still-pending record failed
-  when the queue gives up on the job, and `SequentialOrchestrator` marks the
-  record failed when building or pushing the job throws. Failed records are
-  dispatched again by the next run.
+- Queued operations no longer stay pending forever when the queue gives up on
+  their job, which made every later run skip them. `ExecuteOperation::failed()`
+  marks a still-pending record failed, including on a worker timeout inside the
+  operation's transaction, and `SequentialOrchestrator` marks the record failed
+  when building or pushing the job throws. Failed records are dispatched again
+  by the next run. Push failures in the other orchestrators and in
+  `SequencerManager` are unchanged.
 - A worker that cannot resolve the operation file no longer fails the job, or
   the worker, while loading it in `middleware()`, `tags()` or the unique-lock
   methods. It pushes the job again after a delay on the same connection and
   queue, so a worker that has deployed the file runs it, and fails the job after
-  a bounded number of retries. Batched jobs are released instead.
+  a bounded number of retries. The retry carries the rest of a job chain, so
+  chained operations still run in order. Batched jobs are released instead.
 
 ### Added
 - `sequencer.queue.unresolved_operation.retry_delay` and `max_retries`

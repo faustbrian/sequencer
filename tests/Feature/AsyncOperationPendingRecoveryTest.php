@@ -118,6 +118,88 @@ PHP);
                 ->and(DB::table('jobs')->value('available_at'))->toBeGreaterThanOrEqual(now()->addSeconds(60)->getTimestamp());
         })->group('regression', 'queue');
 
+        test('requeues on the queue the job came from after the configured delay', function (): void {
+            Config::set('sequencer.queue.unresolved_operation.retry_delay', 5);
+            $path = writeAsyncOperation($this->tempDir, '2026_01_01_000022_own_queue', $this->marker);
+
+            resolve(SequentialOrchestrator::class)->process(queue: 'backfills');
+            File::move($path, $this->otherReleaseDir.'/2026_01_01_000022_own_queue.php');
+
+            Artisan::call('queue:work', [
+                'connection' => 'database',
+                '--once' => true,
+                '--tries' => 1,
+                '--queue' => 'backfills',
+            ]);
+
+            $job = DB::table('jobs')->sole();
+            expect($job->queue)->toBe('backfills')
+                ->and($job->attempts)->toBe(0)
+                ->and($job->available_at)->toBeGreaterThanOrEqual(now()->addSeconds(5)->getTimestamp())
+                ->and($job->available_at)->toBeLessThan(now()->addSeconds(60)->getTimestamp());
+        })->group('regression', 'queue');
+
+        test('keeps a job chain in order and runs each operation once', function (): void {
+            Config::set('sequencer.queue.unresolved_operation.retry_delay', 60);
+            $secondMarker = $this->marker.'_second';
+            $first = writeAsyncOperation($this->tempDir, '2026_01_01_000023_chain_first', $this->marker);
+            $second = $this->tempDir.'/2026_01_01_000024_chain_second.php';
+            File::put($second, sprintf(<<<'PHP'
+<?php
+
+use Cline\Sequencer\Contracts\Asynchronous;
+use Cline\Sequencer\Contracts\Operation;
+
+return new class() implements Asynchronous, Operation {
+    public function handle(): void
+    {
+        $first = file_exists('%1$s') ? 'after-first' : 'before-first';
+        file_put_contents('%2$s', $first."\n", FILE_APPEND);
+    }
+};
+PHP, $this->marker, $secondMarker));
+
+            $records = [];
+
+            foreach (['2026_01_01_000023_chain_first', '2026_01_01_000024_chain_second'] as $name) {
+                $records[] = OperationModel::query()->create([
+                    'name' => $name,
+                    'type' => 'async',
+                    'executed_at' => now(),
+                    'state' => OperationState::Pending,
+                ]);
+            }
+
+            Bus::chain([
+                new ExecuteOperation($first, $records[0]->id),
+                new ExecuteOperation($second, $records[1]->id),
+            ])->onConnection('database')->onQueue('default')->dispatch();
+
+            try {
+                File::move($first, $this->otherReleaseDir.'/2026_01_01_000023_chain_first.php');
+                workOnce();
+
+                expect(queuedJobCount())->toBe(1)
+                    ->and(file_exists($secondMarker))->toBeFalse()
+                    ->and($records[1]->fresh()->state)->toBe(OperationState::Pending);
+
+                File::move($this->otherReleaseDir.'/2026_01_01_000023_chain_first.php', $first);
+                $this->travel(61)->seconds();
+                workOnce();
+                workOnce();
+                workOnce();
+
+                expect(file_get_contents($secondMarker))->toBe("after-first\n")
+                    ->and($records[0]->fresh()->state)->toBe(OperationState::Completed)
+                    ->and($records[1]->fresh()->state)->toBe(OperationState::Completed)
+                    ->and(queuedJobCount())->toBe(0);
+            } finally {
+                if (file_exists($secondMarker)) {
+                    File::delete($secondMarker);
+                }
+            }
+        })->group('regression', 'queue');
+
         test('runs the operation once a worker has the file', function (): void {
             Config::set('sequencer.queue.unresolved_operation.retry_delay', 60);
             $path = writeAsyncOperation($this->tempDir, '2026_01_01_000001_deployed_later', $this->marker);
