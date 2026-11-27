@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Queued operations no longer stay pending forever, which made every later run
+  skip them. `ExecuteOperation::failed()` marks a still-pending record failed
+  when the queue gives up on the job, and `SequentialOrchestrator` marks the
+  record failed when building or pushing the job throws. Failed records are
+  dispatched again by the next run.
+- A worker that cannot resolve the operation file no longer fails the job, or
+  the worker, while loading it in `middleware()`, `tags()` or the unique-lock
+  methods. It pushes the job again after a delay on the same connection and
+  queue, so a worker that has deployed the file runs it, and fails the job after
+  a bounded number of retries. Batched jobs are released instead.
+
+### Added
+- `sequencer.queue.unresolved_operation.retry_delay` and `max_retries`
+  (`SEQUENCER_UNRESOLVED_OPERATION_RETRY_DELAY`,
+  `SEQUENCER_UNRESOLVED_OPERATION_MAX_RETRIES`, both default 60).
+- `OperationNotFoundException::forUnresolvedPath()`, thrown when a queued
+  operation file does not resolve. `ExecuteOperation` now throws it instead of a
+  PHP warning from `require` when the file is missing outside a queue worker.
+
 ## [3.3.0] - 2026-10-24
 
 ### Added

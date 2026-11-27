@@ -103,6 +103,26 @@ This does not bound direct `DeferredOperationProcessor::processDue()` calls or
 queued operation jobs. It also cannot undo an external effect accepted before a
 worker dies: replay is still at least once, so handlers must remain replay-safe.
 
+## Queued operations
+
+Operations implementing `Asynchronous` are recorded as pending and pushed as
+`ExecuteOperation` jobs. Later runs skip pending records, so the job always
+moves its record out of pending:
+
+- A worker that cannot find the operation file, typically one still on the
+  previous release when web and worker servers deploy separately, pushes the
+  job again after `sequencer.queue.unresolved_operation.retry_delay` seconds
+  (default 60) instead of running it. After `max_retries` (default 60) the
+  job fails. Batched jobs are released instead and use up their tries.
+- When the queue gives up on a job (attempts exhausted, timeout, or a worker
+  that died), `failed()` marks a still-pending record failed.
+- When pushing the job throws, the record is marked failed and the exception
+  is rethrown.
+
+A failed record is offered again on the next `sequencer:process` run. A
+queued operation is not ordered against the migrations and operations after
+it, so nothing in the same run should depend on its result.
+
 ## Documentation
 
 - **[Getting Started](DOCS.md#doc-docs-readme)** - Installation, configuration, and first operation

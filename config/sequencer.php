@@ -301,11 +301,9 @@ return [
         */
 
         'retry_delay_seconds' => env('SEQUENCER_DEFERRED_RETRY_DELAY_SECONDS', 60),
-
         // Must exceed the longest handler duration. Expiry permits at-least-once
         // recovery of a lost worker; handlers must tolerate repeated effects.
         'retry_after_seconds' => env('SEQUENCER_DEFERRED_RETRY_AFTER_SECONDS', 300),
-
         /*
         |--------------------------------------------------------------------------
         | Deferred Command Runtime
@@ -325,7 +323,6 @@ return [
             'recovery_margin_seconds' => env('SEQUENCER_DEFERRED_RUNTIME_RECOVERY_MARGIN_SECONDS', 50),
             'timeout_binary' => env('SEQUENCER_DEFERRED_RUNTIME_TIMEOUT_BINARY', '/usr/bin/timeout'),
         ],
-
         // Exact stored identifiers whose payload is erased on Completed/Failed.
         // Retryable attempts retain inputs; cancellation/erasure is caller-owned.
         'erase_payload_for' => [],
@@ -524,6 +521,24 @@ return [
         */
 
         'queue' => env('SEQUENCER_QUEUE', 'default'),
+        /*
+        |--------------------------------------------------------------------------
+        | Unresolved Operation Files
+        |--------------------------------------------------------------------------
+        |
+        | A worker on an older release may take a job for an operation file it
+        | does not have yet. The job is then pushed again after retry_delay
+        | seconds, up to max_retries times, so a worker that has deployed the
+        | file runs it. After that the job fails and the operation is marked
+        | Failed, which lets the next sequencer run dispatch it again. Batched
+        | jobs are released instead, which counts against their tries.
+        |
+        */
+
+        'unresolved_operation' => [
+            'retry_delay' => (int) env('SEQUENCER_UNRESOLVED_OPERATION_RETRY_DELAY', 60),
+            'max_retries' => (int) env('SEQUENCER_UNRESOLVED_OPERATION_MAX_RETRIES', 60),
+        ],
     ],
     /*
     |--------------------------------------------------------------------------

@@ -39,4 +39,19 @@ final class OperationNotFoundException extends RuntimeException implements Seque
     {
         return new self(sprintf('Operation not found: %s', $operation));
     }
+
+    /**
+     * Create exception for an operation file that does not resolve on this worker.
+     *
+     * Thrown when a queued operation's file exists neither at its dispatched path
+     * nor in the current discovery paths, typically because the worker runs a
+     * release that does not contain the operation yet.
+     *
+     * @param  string $path The operation file path the job was dispatched with
+     * @return self   Exception instance with the path in the error message
+     */
+    public static function forUnresolvedPath(string $path): self
+    {
+        return new self(sprintf('Operation file not found on this worker: %s', $path));
+    }
 }
