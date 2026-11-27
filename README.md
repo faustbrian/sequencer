@@ -106,8 +106,10 @@ worker dies: replay is still at least once, so handlers must remain replay-safe.
 ## Queued operations
 
 Operations implementing `Asynchronous` are recorded as pending and pushed as
-`ExecuteOperation` jobs. Later runs skip pending records, so the job always
-moves its record out of pending:
+`ExecuteOperation` jobs. Later runs skip pending records, so the job moves its
+record out of pending when it runs, when the queue gives up on it, and when it
+times out. A job removed from the queue by other means, such as a cleared queue,
+leaves its record pending.
 
 - A worker that cannot find the operation file, typically one still on the
   previous release when web and worker servers deploy separately, pushes the

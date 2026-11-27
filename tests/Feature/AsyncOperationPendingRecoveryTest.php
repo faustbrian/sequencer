@@ -107,6 +107,7 @@ PHP);
             // The worker server has not deployed this release yet: the file is not on it.
             File::move($path, $this->otherReleaseDir.'/2026_01_01_000000_late_worker.php');
 
+            $before = now()->getTimestamp();
             workOnce();
 
             $record = OperationModel::query()->sole();
@@ -115,7 +116,7 @@ PHP);
                 ->and(file_exists($this->marker))->toBeFalse()
                 ->and(queuedJobCount())->toBe(1)
                 ->and(DB::table('jobs')->value('attempts'))->toBe(0)
-                ->and(DB::table('jobs')->value('available_at'))->toBeGreaterThanOrEqual(now()->addSeconds(60)->getTimestamp());
+                ->and(DB::table('jobs')->value('available_at'))->toBeGreaterThanOrEqual($before + 60);
         })->group('regression', 'queue');
 
         test('requeues on the queue the job came from after the configured delay', function (): void {
@@ -125,18 +126,20 @@ PHP);
             resolve(SequentialOrchestrator::class)->process(queue: 'backfills');
             File::move($path, $this->otherReleaseDir.'/2026_01_01_000022_own_queue.php');
 
+            $before = now()->getTimestamp();
             Artisan::call('queue:work', [
                 'connection' => 'database',
                 '--once' => true,
                 '--tries' => 1,
                 '--queue' => 'backfills',
             ]);
+            $after = now()->getTimestamp();
 
             $job = DB::table('jobs')->sole();
             expect($job->queue)->toBe('backfills')
                 ->and($job->attempts)->toBe(0)
-                ->and($job->available_at)->toBeGreaterThanOrEqual(now()->addSeconds(5)->getTimestamp())
-                ->and($job->available_at)->toBeLessThan(now()->addSeconds(60)->getTimestamp());
+                ->and($job->available_at)->toBeGreaterThanOrEqual($before + 5)
+                ->and($job->available_at)->toBeLessThanOrEqual($after + 5);
         })->group('regression', 'queue');
 
         test('keeps a job chain in order and runs each operation once', function (): void {
@@ -638,6 +641,18 @@ PHP);
             resolve(SequentialOrchestrator::class)->process();
 
             expect(queuedJobCount())->toBe(1);
+        })->group('regression', 'queue');
+
+        test('records a failing operation once on a sync queue', function (): void {
+            Config::set('sequencer.queue.connection', 'sync');
+            writeAsyncOperation($this->tempDir, '2026_01_01_000026_sync_throws', $this->marker, "throw new RuntimeException('sync boom');");
+
+            expect(fn () => resolve(SequentialOrchestrator::class)->process())
+                ->toThrow(RuntimeException::class, 'sync boom');
+
+            $record = OperationModel::query()->sole();
+            expect($record->state)->toBe(OperationState::Failed)
+                ->and(OperationError::query()->where('operation_id', $record->id)->count())->toBe(1);
         })->group('regression', 'queue');
 
         test('marks the record Failed when building the job throws', function (): void {

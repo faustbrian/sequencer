@@ -35,6 +35,7 @@ use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted as LaravelShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldBeUnique as LaravelShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Connection;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -435,13 +436,15 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
         // transaction is still open, then kills the worker. It rolls back only the
         // failed-job log connection, so without this the Failed write would be
         // lost with the transaction and the record would stay Pending.
-        if ($exception instanceof TimeoutExceededException && $connection->transactionLevel() > 0) {
+        if ($exception instanceof TimeoutExceededException && $connection instanceof Connection && $connection->transactionLevel() > 0) {
             $connection->rollBack(0);
         }
 
         // Lock the row so a run that completes concurrently is not overwritten.
         $record = $connection->transaction(function (): ?OperationModel {
-            $record = OperationModel::query()->lockForUpdate()->find($this->recordId);
+            $query = OperationModel::query()->whereKey($this->recordId);
+            $query->lockForUpdate();
+            $record = $query->first();
 
             if (!$record instanceof OperationModel || $record->state !== OperationState::Pending) {
                 return null;

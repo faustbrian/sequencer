@@ -519,12 +519,19 @@ final readonly class SequentialOrchestrator implements Orchestrator
                 new ExecuteOperation($operationPath, $recordId),
             );
         } catch (Throwable $throwable) {
-            $record->update([
-                'failed_at' => Date::now(),
-                'state' => OperationState::Failed,
-            ]);
+            // A sync queue runs the job inside the push and rethrows its failure,
+            // after the job already recorded its own outcome. Only a record that
+            // is still Pending belongs to this push.
+            $record->refresh();
 
-            $this->recordError($record, $throwable);
+            if ($record->state === OperationState::Pending) {
+                $record->update([
+                    'failed_at' => Date::now(),
+                    'state' => OperationState::Failed,
+                ]);
+
+                $this->recordError($record, $throwable);
+            }
 
             throw $throwable;
         }
