@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   queue, so a worker that has deployed the file runs it, and fails the job after
   a bounded number of retries. The retry carries the rest of a job chain, so
   chained operations still run in order. Batched jobs are released instead.
+  Workers must run this version before an operation that relies on this is
+  queued: an older worker still fails on the missing file.
 
 ### Added
 - `sequencer.queue.unresolved_operation.retry_delay` and `max_retries`

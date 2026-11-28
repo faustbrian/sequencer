@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 
 uses(RefreshDatabase::class);
 
@@ -624,6 +625,42 @@ PHP);
                 ->and(DB::table('jobs')->value('attempts'))->toBe(1)
                 ->and(DB::table('jobs')->value('available_at'))->toBeGreaterThanOrEqual($before + 60);
         })->group('regression', 'queue');
+
+        test('fails a batched job once its tries reach max_retries', function (): void {
+            Config::set('queue.batching.database', 'testing');
+            Config::set('queue.batching.table', 'job_batches');
+            Config::set('sequencer.queue.unresolved_operation.max_retries', 1);
+            $path = writeAsyncOperation($this->tempDir, '2026_01_01_000028_batched_bound', $this->marker);
+            $record = OperationModel::query()->create([
+                'name' => '2026_01_01_000028_batched_bound',
+                'type' => 'async',
+                'executed_at' => now(),
+                'state' => OperationState::Pending,
+            ]);
+            $batch = Bus::batch([new ExecuteOperation($path, $record->id)])
+                ->onConnection('database')
+                ->onQueue('default')
+                ->dispatch();
+            File::move($path, $this->otherReleaseDir.'/2026_01_01_000028_batched_bound.php');
+            $work = fn (): int => Artisan::call('queue:work', [
+                'connection' => 'database',
+                '--once' => true,
+                '--tries' => 0,
+                '--queue' => 'default',
+            ]);
+
+            $work();
+
+            expect($record->fresh()->state)->toBe(OperationState::Pending)
+                ->and(queuedJobCount())->toBe(1);
+
+            $this->travel(2)->minutes();
+            $work();
+
+            expect($record->fresh()->state)->toBe(OperationState::Failed)
+                ->and($batch->fresh()->failedJobs)->toBe(1)
+                ->and(queuedJobCount())->toBe(0);
+        })->group('regression', 'queue');
     });
 
     describe('push that fails after the record was written', function (): void {
@@ -653,6 +690,14 @@ PHP);
             Event::listen('eloquent.updating: '.OperationModel::class, function (): void {
                 throw new LogicException('database down');
             });
+
+            Log::shouldReceive('channel')->andReturnSelf();
+            Log::shouldReceive('error')
+                ->once()
+                ->with('Could not mark operation Failed after its push failed', Mockery::on(
+                    fn (array $context): bool => $context['exception'] === LogicException::class
+                        && $context['push_exception'] === InvalidArgumentException::class,
+                ));
 
             expect(fn () => resolve(SequentialOrchestrator::class)->process())
                 ->toThrow(InvalidArgumentException::class);

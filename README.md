@@ -127,6 +127,11 @@ it, so nothing in the same run should depend on its result. Queued execution
 is at least once: keep the queue's `retry_after` above the job timeout and make
 queued operations safe to run again.
 
+These protections run on the worker, so they hold only once worker servers run
+this version. A worker on an older release that still has an older copy of the
+same file runs that copy, including after a failed operation is fixed in place.
+Deploy worker servers first, or use a dedicated queue, when that matters.
+
 ## Documentation
 
 - **[Getting Started](DOCS.md#doc-docs-readme)** - Installation, configuration, and first operation
