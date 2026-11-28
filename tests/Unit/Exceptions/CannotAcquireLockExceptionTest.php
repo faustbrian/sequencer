@@ -45,7 +45,7 @@ describe('CannotAcquireLockException', function (): void {
             $exception = CannotAcquireLockException::timeoutExceeded();
 
             // Act & Assert
-            expect(fn () => throw $exception)
+            expect(fn (): never => throw $exception)
                 ->toThrow(CannotAcquireLockException::class);
         });
     });
@@ -122,13 +122,13 @@ describe('CannotAcquireLockException', function (): void {
     describe('Sad Path - Exception Handling', function (): void {
         test('exception can be caught with RuntimeException type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw CannotAcquireLockException::timeoutExceeded())
+            expect(fn (): never => throw CannotAcquireLockException::timeoutExceeded())
                 ->toThrow(RuntimeException::class);
         });
 
         test('exception can be caught with Exception type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw CannotAcquireLockException::timeoutExceeded())
+            expect(fn (): never => throw CannotAcquireLockException::timeoutExceeded())
                 ->toThrow(Exception::class);
         });
 

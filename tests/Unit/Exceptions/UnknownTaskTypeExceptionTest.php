@@ -45,7 +45,7 @@ describe('UnknownTaskTypeException', function (): void {
             $exception = UnknownTaskTypeException::forType('invalid-type');
 
             // Act & Assert
-            expect(fn () => throw $exception)
+            expect(fn (): never => throw $exception)
                 ->toThrow(UnknownTaskTypeException::class);
         });
     });
@@ -170,13 +170,13 @@ describe('UnknownTaskTypeException', function (): void {
     describe('Sad Path - Exception Handling', function (): void {
         test('exception can be caught with LogicException type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw UnknownTaskTypeException::forType('invalid-type'))
+            expect(fn (): never => throw UnknownTaskTypeException::forType('invalid-type'))
                 ->toThrow(LogicException::class);
         });
 
         test('exception can be caught with Exception type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw UnknownTaskTypeException::forType('invalid-type'))
+            expect(fn (): never => throw UnknownTaskTypeException::forType('invalid-type'))
                 ->toThrow(Exception::class);
         });
 
