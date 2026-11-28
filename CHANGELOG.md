@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `ExecuteOperation` constructor, and `handle()` outside a queue worker, now
   throw `OperationNotFoundException` instead of the `ErrorException` that
   `require` raised for a missing operation file.
+- Development only: Rector is held below 2.9, which removed
+  `RectorConfigBuilder::withSetProviders()` that `cline/coding-standard` 2.x
+  still calls, and test closures carry the arrow-function return types that
+  Rector 2.8 adds.
 
 ## [3.3.0] - 2026-10-24
 

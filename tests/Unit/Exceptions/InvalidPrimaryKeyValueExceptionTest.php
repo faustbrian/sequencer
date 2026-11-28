@@ -90,7 +90,7 @@ describe('InvalidPrimaryKeyValueException', function (): void {
             $exception = InvalidUuidPrimaryKeyValueException::fromValue(123);
 
             // Act & Assert
-            expect(fn () => throw $exception)
+            expect(fn (): never => throw $exception)
                 ->toThrow(InvalidPrimaryKeyValueException::class);
         });
     });
@@ -168,7 +168,7 @@ describe('InvalidPrimaryKeyValueException', function (): void {
             $exception = InvalidUlidPrimaryKeyValueException::fromValue(456);
 
             // Act & Assert
-            expect(fn () => throw $exception)
+            expect(fn (): never => throw $exception)
                 ->toThrow(InvalidPrimaryKeyValueException::class);
         });
     });
@@ -366,25 +366,25 @@ describe('InvalidPrimaryKeyValueException', function (): void {
     describe('Sad Path - Exception Handling', function (): void {
         test('UUID exception can be caught with InvalidArgumentException type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw InvalidUuidPrimaryKeyValueException::fromValue(123))
+            expect(fn (): never => throw InvalidUuidPrimaryKeyValueException::fromValue(123))
                 ->toThrow(InvalidArgumentException::class);
         });
 
         test('ULID exception can be caught with InvalidArgumentException type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw InvalidUlidPrimaryKeyValueException::fromValue(456))
+            expect(fn (): never => throw InvalidUlidPrimaryKeyValueException::fromValue(456))
                 ->toThrow(InvalidArgumentException::class);
         });
 
         test('UUID exception can be caught with Exception type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw InvalidUuidPrimaryKeyValueException::fromValue(123))
+            expect(fn (): never => throw InvalidUuidPrimaryKeyValueException::fromValue(123))
                 ->toThrow(Exception::class);
         });
 
         test('ULID exception can be caught with Exception type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw InvalidUlidPrimaryKeyValueException::fromValue(456))
+            expect(fn (): never => throw InvalidUlidPrimaryKeyValueException::fromValue(456))
                 ->toThrow(Exception::class);
         });
 

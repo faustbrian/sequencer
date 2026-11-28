@@ -45,7 +45,7 @@ describe('CircularDependencyException', function (): void {
             $exception = CircularDependencyException::detected();
 
             // Act & Assert
-            expect(fn () => throw $exception)
+            expect(fn (): never => throw $exception)
                 ->toThrow(CircularDependencyException::class);
         });
     });
@@ -131,13 +131,13 @@ describe('CircularDependencyException', function (): void {
     describe('Sad Path - Exception Handling', function (): void {
         test('exception can be caught with RuntimeException type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw CircularDependencyException::detected())
+            expect(fn (): never => throw CircularDependencyException::detected())
                 ->toThrow(RuntimeException::class);
         });
 
         test('exception can be caught with Exception type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw CircularDependencyException::detected())
+            expect(fn (): never => throw CircularDependencyException::detected())
                 ->toThrow(Exception::class);
         });
 

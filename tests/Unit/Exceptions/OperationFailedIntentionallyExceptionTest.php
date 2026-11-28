@@ -45,7 +45,7 @@ describe('OperationFailedIntentionallyException', function (): void {
             $exception = OperationFailedIntentionallyException::create();
 
             // Act & Assert
-            expect(fn () => throw $exception)
+            expect(fn (): never => throw $exception)
                 ->toThrow(OperationFailedIntentionallyException::class);
         });
     });
@@ -130,13 +130,13 @@ describe('OperationFailedIntentionallyException', function (): void {
     describe('Sad Path - Exception Handling', function (): void {
         test('exception can be caught with RuntimeException type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw OperationFailedIntentionallyException::create())
+            expect(fn (): never => throw OperationFailedIntentionallyException::create())
                 ->toThrow(RuntimeException::class);
         });
 
         test('exception can be caught with Exception type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw OperationFailedIntentionallyException::create())
+            expect(fn (): never => throw OperationFailedIntentionallyException::create())
                 ->toThrow(Exception::class);
         });
 

@@ -45,7 +45,7 @@ describe('OperationMustImplementScheduledException', function (): void {
             $exception = OperationMustImplementScheduledException::forDispatch();
 
             // Act & Assert
-            expect(fn () => throw $exception)
+            expect(fn (): never => throw $exception)
                 ->toThrow(OperationMustImplementScheduledException::class);
         });
     });
@@ -112,13 +112,13 @@ describe('OperationMustImplementScheduledException', function (): void {
     describe('Sad Path - Exception Handling', function (): void {
         test('exception can be caught with LogicException type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw OperationMustImplementScheduledException::forDispatch())
+            expect(fn (): never => throw OperationMustImplementScheduledException::forDispatch())
                 ->toThrow(LogicException::class);
         });
 
         test('exception can be caught with Exception type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw OperationMustImplementScheduledException::forDispatch())
+            expect(fn (): never => throw OperationMustImplementScheduledException::forDispatch())
                 ->toThrow(Exception::class);
         });
 
