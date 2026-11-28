@@ -554,6 +554,11 @@ PHP);
                 ->toThrow(OperationNotFoundException::class, 'Operation file not found on this worker');
         })->group('regression', 'queue');
 
+        test('throws a sequencer exception when constructed for a missing file', function (): void {
+            expect(fn (): ExecuteOperation => new ExecuteOperation($this->tempDir.'/2026_01_01_000029_never_written.php', 1))
+                ->toThrow(OperationNotFoundException::class);
+        })->group('regression', 'queue');
+
         test('runs the file found through a discovery path without deferring', function (): void {
             $dispatchedPath = $this->otherReleaseDir.'/2026_01_01_000018_moved_release.php';
             writeAsyncOperation($this->otherReleaseDir, '2026_01_01_000018_moved_release', $this->marker);

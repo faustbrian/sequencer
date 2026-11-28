@@ -436,9 +436,10 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
         $connection = OperationModel::query()->getConnection();
 
         // On timeout Laravel calls this from its alarm handler while handle()'s
-        // transaction is still open, then kills the worker. It rolls back only the
-        // failed-job log connection, so without this the Failed write would be
-        // lost with the transaction and the record would stay Pending.
+        // transaction is still open, then kills the worker. Job::fail() rolls back
+        // only the batch repository's connection and the failed-job log's, so
+        // when the operations connection is another one, the Failed write would
+        // be lost with the open transaction and the record would stay Pending.
         if ($exception instanceof TimeoutExceededException && $connection instanceof Connection && $connection->transactionLevel() > 0) {
             $connection->rollBack(0);
         }
