@@ -494,6 +494,8 @@ final readonly class SequentialOrchestrator implements Orchestrator
      * @param Operation      $operation     The operation instance to execute asynchronously
      * @param string         $operationPath Absolute file path to the operation file
      * @param OperationModel $record        The operation database record for tracking status
+     *
+     * @throws Throwable When building or pushing the job fails, after marking the record Failed
      */
     private function dispatchAsync(Operation $operation, string $operationPath, OperationModel $record, ?string $queue = null): void
     {
@@ -509,10 +511,57 @@ final readonly class SequentialOrchestrator implements Orchestrator
         /** @var int|string $recordId */
         $recordId = $record->id;
 
-        Queue::connection($connection)->pushOn(
-            $queueName,
-            new ExecuteOperation($operationPath, $recordId),
-        );
+        // The record is already Pending, and discovery skips Pending records, so a
+        // failed push must leave it Failed for the next run to dispatch it again.
+        try {
+            Queue::connection($connection)->pushOn(
+                $queueName,
+                new ExecuteOperation($operationPath, $recordId),
+            );
+        } catch (Throwable $throwable) {
+            $this->markPushFailed($record, $throwable);
+
+            throw $throwable;
+        }
+    }
+
+    /**
+     * Mark the record Failed after building or pushing its job threw.
+     *
+     * A sync queue runs the job inside the push and rethrows its failure after
+     * the job already recorded its own outcome, so only a record that is still
+     * Pending belongs to this push. A failure while marking it, such as the
+     * database being down too, is logged so the push failure stays the error
+     * the caller sees.
+     *
+     * @param OperationModel $record    The operation record written before the push
+     * @param Throwable      $throwable Why building or pushing the job failed
+     */
+    private function markPushFailed(OperationModel $record, Throwable $throwable): void
+    {
+        try {
+            $record->refresh();
+
+            if ($record->state !== OperationState::Pending) {
+                return;
+            }
+
+            $record->update([
+                'failed_at' => Date::now(),
+                'state' => OperationState::Failed,
+            ]);
+
+            $this->recordError($record, $throwable);
+        } catch (Throwable $markingFailure) {
+            /** @var string $logChannel */
+            $logChannel = config('sequencer.errors.log_channel', 'stack');
+            Log::channel($logChannel)->error('Could not mark operation Failed after its push failed', [
+                'operation' => $record->name,
+                'push_exception' => $throwable::class,
+                'exception' => $markingFailure::class,
+                'message' => $markingFailure->getMessage(),
+            ]);
+        }
     }
 
     /**

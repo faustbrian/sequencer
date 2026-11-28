@@ -25,6 +25,7 @@ use Cline\Sequencer\Enums\OperationState;
 use Cline\Sequencer\Events\OperationEnded;
 use Cline\Sequencer\Events\OperationSkipped;
 use Cline\Sequencer\Events\OperationStarted;
+use Cline\Sequencer\Exceptions\OperationNotFoundException;
 use Cline\Sequencer\Exceptions\SkipOperationException;
 use DateTimeInterface;
 use Illuminate\Bus\Batchable;
@@ -34,13 +35,16 @@ use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted as LaravelShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldBeUnique as LaravelShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Connection;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
 use Throwable;
 
 use function array_values;
@@ -55,6 +59,7 @@ use function mb_substr;
 use function preg_match;
 use function sprintf;
 use function str_starts_with;
+use function throw_if;
 
 /**
  * Queue job for executing operations asynchronously.
@@ -137,6 +142,26 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
     public ?int $maxExceptions = null;
 
     /**
+     * How often this job was put back because no operation file resolved.
+     *
+     * A worker on an older release does not have a newly deployed operation
+     * file. The job is then pushed again with a delay, carrying this count,
+     * until a worker that has the file takes it or the configured bound is
+     * reached. Old payloads lack the property and start at zero.
+     */
+    private int $unresolvedRetries = 0;
+
+    /**
+     * Unique key of a ShouldBeUnique operation, captured at dispatch.
+     *
+     * Lets a worker without the operation file release the lock under the key
+     * the dispatcher used. Without the file the operation's own uniqueVia()
+     * store is unknown, so that release uses the default cache store. Null for
+     * other operations and old payloads.
+     */
+    private ?string $uniqueKey = null;
+
+    /**
      * Create a new job instance.
      *
      * Automatically configures job behavior based on operation interfaces. If the operation
@@ -177,6 +202,10 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
             $this->failOnTimeout = $operation->failOnTimeout();
         }
 
+        if ($operation instanceof ShouldBeUnique) {
+            $this->uniqueKey = $operation->uniqueId();
+        }
+
         // Apply max exceptions configuration from operation if it implements HasMaxExceptions
         if (!$operation instanceof HasMaxExceptions) {
             return;
@@ -196,7 +225,7 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
      */
     public function middleware(): array
     {
-        $operation = $this->loadOperation();
+        $operation = $this->resolveOperation();
 
         if ($operation instanceof HasMiddleware) {
             return array_values($operation->middleware());
@@ -216,7 +245,7 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
      */
     public function tags(): array
     {
-        $operation = $this->loadOperation();
+        $operation = $this->resolveOperation();
 
         if ($operation instanceof HasTags) {
             return array_values($operation->tags());
@@ -236,13 +265,13 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
      */
     public function uniqueId(): string
     {
-        $operation = $this->loadOperation();
+        $operation = $this->resolveOperation();
 
         if ($operation instanceof ShouldBeUnique) {
             return $operation->uniqueId();
         }
 
-        return (string) $this->recordId;
+        return $this->uniqueKey ?? (string) $this->recordId;
     }
 
     /**
@@ -256,7 +285,7 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
      */
     public function uniqueFor(): int
     {
-        $operation = $this->loadOperation();
+        $operation = $this->resolveOperation();
 
         if ($operation instanceof ShouldBeUnique) {
             return $operation->uniqueFor();
@@ -279,7 +308,7 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
      */
     public function uniqueVia(): Repository
     {
-        $operation = $this->loadOperation();
+        $operation = $this->resolveOperation();
 
         if ($operation instanceof ShouldBeUnique) {
             $repository = $operation->uniqueVia();
@@ -306,6 +335,13 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
     {
         $startTime = hrtime(true);
         $record = OperationModel::query()->findOrFail($this->recordId);
+
+        // A worker on a release without this operation file must not run it
+        if ($this->resolveOperationPath() === null) {
+            $this->deferUnresolvedOperation();
+
+            return;
+        }
 
         // Require operation file to get instance
         $operation = $this->loadOperation();
@@ -381,6 +417,121 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
     }
 
     /**
+     * Mark the operation Failed when the queue gives up on the job.
+     *
+     * Laravel calls this when the job exhausts its attempts, times out, is
+     * picked up again after its worker died, or fails while it waits for an
+     * unresolved operation file. Only a record still Pending changes: when
+     * handle() already recorded a failure, completion or skip, that outcome
+     * stands. A Failed record is offered again by discovery on the next run,
+     * while a Pending one would be skipped forever.
+     *
+     * The operation's own lifecycle hooks are not called here, because the
+     * operation file may not exist on this worker.
+     *
+     * @param null|Throwable $exception The reason the queue gave up, when known
+     */
+    public function failed(?Throwable $exception = null): void
+    {
+        $connection = OperationModel::query()->getConnection();
+
+        // On timeout Laravel calls this from its alarm handler while handle()'s
+        // transaction is still open, then kills the worker. Job::fail() rolls back
+        // only the batch repository's connection and the failed-job log's, so
+        // when the operations connection is another one, the Failed write would
+        // be lost with the open transaction and the record would stay Pending.
+        if ($exception instanceof TimeoutExceededException && $connection instanceof Connection && $connection->transactionLevel() > 0) {
+            $connection->rollBack(0);
+        }
+
+        // Lock the row so a run that completes concurrently is not overwritten.
+        $record = $connection->transaction(function (): ?OperationModel {
+            $query = OperationModel::query()->whereKey($this->recordId);
+            $query->lockForUpdate();
+
+            $record = $query->first();
+
+            if (!$record instanceof OperationModel || $record->state !== OperationState::Pending) {
+                return null;
+            }
+
+            $record->update([
+                'failed_at' => Date::now(),
+                'state' => OperationState::Failed,
+            ]);
+
+            return $record;
+        });
+
+        if (!$record instanceof OperationModel || !$exception instanceof Throwable) {
+            return;
+        }
+
+        $this->recordError($record, $exception);
+    }
+
+    /**
+     * Put the job back until a worker that has the operation file takes it.
+     *
+     * Web and worker servers can deploy separately while sharing one queue, so
+     * a worker still on the previous release can take a job for an operation
+     * file it does not have yet. The job is pushed again with a delay on the
+     * same connection and queue; a batched job is released instead so batch
+     * accounting stays intact, which spends one of its attempts. After the
+     * configured number of retries the job fails, and failed() marks the record.
+     *
+     * @throws OperationNotFoundException When run outside a queue worker
+     */
+    private function deferUnresolvedOperation(): void
+    {
+        $exception = OperationNotFoundException::forUnresolvedPath($this->operationPath);
+
+        throw_if($this->job === null, $exception);
+
+        $retries = $this->batchId === null
+            ? $this->unresolvedRetries
+            : $this->attempts() - 1;
+
+        /** @var int $maxRetries */
+        $maxRetries = config('sequencer.queue.unresolved_operation.max_retries', 60);
+
+        if ($retries >= $maxRetries) {
+            $this->fail($exception);
+
+            return;
+        }
+
+        /** @var int $delay */
+        $delay = config('sequencer.queue.unresolved_operation.retry_delay', 60);
+
+        /** @var string $logChannel */
+        $logChannel = config('sequencer.errors.log_channel', 'stack');
+        Log::channel($logChannel)->warning('Operation file not found on this worker; retrying later', [
+            'operation' => basename($this->operationPath),
+            'retry' => $retries + 1,
+            'max_retries' => $maxRetries,
+            'delay' => $delay,
+        ]);
+
+        if ($this->batchId !== null) {
+            $this->release($delay);
+
+            return;
+        }
+
+        $retry = clone $this;
+        $retry->job = null;
+        ++$retry->unresolvedRetries;
+
+        Queue::connection($this->job->getConnectionName())
+            ->laterOn($this->job->getQueue(), $delay, $retry);
+
+        // The retry carries the rest of the chain. This job returns normally, so
+        // the queue would otherwise dispatch the next chained job now as well.
+        $this->chained = [];
+    }
+
+    /**
      * Record operation error for audit trail and logging.
      *
      * Creates an OperationError record with exception details (class, message, trace, context)
@@ -435,18 +586,41 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
      */
     private function loadOperation(): Operation
     {
+        $path = $this->resolveOperationPath();
+
+        if ($path === null) {
+            throw OperationNotFoundException::forUnresolvedPath($this->operationPath);
+        }
+
         /** @var Operation $operation */
-        $operation = require $this->resolveOperationPath();
+        $operation = require $path;
 
         return $operation;
     }
 
     /**
+     * Require the operation when its file resolves on this worker.
+     *
+     * Used by the methods Laravel calls around handle() and failed(), which
+     * must not fail on a worker that does not have the operation file.
+     *
+     * @return null|Operation Loaded operation instance, or null when no file resolves
+     */
+    private function resolveOperation(): ?Operation
+    {
+        if ($this->resolveOperationPath() === null) {
+            return null;
+        }
+
+        return $this->loadOperation();
+    }
+
+    /**
      * Resolve the current filesystem path for the operation file.
      *
-     * @return string Absolute path to the operation file
+     * @return null|string Absolute path to the operation file, or null when none exists
      */
-    private function resolveOperationPath(): string
+    private function resolveOperationPath(): ?string
     {
         if (file_exists($this->operationPath)) {
             return $this->operationPath;
@@ -474,7 +648,7 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
             }
         }
 
-        return $this->operationPath;
+        return null;
     }
 
     /**

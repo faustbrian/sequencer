@@ -524,6 +524,24 @@ return [
         */
 
         'queue' => env('SEQUENCER_QUEUE', 'default'),
+        /*
+        |--------------------------------------------------------------------------
+        | Unresolved Operation Files
+        |--------------------------------------------------------------------------
+        |
+        | A worker on an older release may take a job for an operation file it
+        | does not have yet. The job is then pushed again after retry_delay
+        | seconds, up to max_retries times, so a worker that has deployed the
+        | file runs it. After that the job fails and the operation is marked
+        | Failed, which lets the next sequencer run dispatch it again. Batched
+        | jobs are released instead, which counts against their tries.
+        |
+        */
+
+        'unresolved_operation' => [
+            'retry_delay' => (int) env('SEQUENCER_UNRESOLVED_OPERATION_RETRY_DELAY', 60),
+            'max_retries' => (int) env('SEQUENCER_UNRESOLVED_OPERATION_MAX_RETRIES', 60),
+        ],
     ],
     /*
     |--------------------------------------------------------------------------

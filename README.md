@@ -103,6 +103,35 @@ This does not bound direct `DeferredOperationProcessor::processDue()` calls or
 queued operation jobs. It also cannot undo an external effect accepted before a
 worker dies: replay is still at least once, so handlers must remain replay-safe.
 
+## Queued operations
+
+Operations implementing `Asynchronous` are recorded as pending and pushed as
+`ExecuteOperation` jobs. Later runs skip pending records, so the job moves its
+record out of pending when it runs, when the queue gives up on it, and when it
+times out. A job removed from the queue by other means, such as a cleared queue,
+leaves its record pending.
+
+- A worker that cannot find the operation file, typically one still on the
+  previous release when web and worker servers deploy separately, pushes the
+  job again after `sequencer.queue.unresolved_operation.retry_delay` seconds
+  (default 60) instead of running it. After `max_retries` (default 60) the
+  job fails. Batched jobs are released instead and use up their tries.
+- When the queue gives up on a job (attempts exhausted, timeout, or a worker
+  that died), `failed()` marks a still-pending record failed.
+- When `SequentialOrchestrator` fails to build or push the job, the record is
+  marked failed and the exception is rethrown.
+
+A failed record is offered again on the next `sequencer:process` run. A
+queued operation is not ordered against the migrations and operations after
+it, so nothing in the same run should depend on its result. Queued execution
+is at least once: keep the queue's `retry_after` above the job timeout and make
+queued operations safe to run again.
+
+These protections run on the worker, so they hold only once worker servers run
+this version. A worker on an older release that still has an older copy of the
+same file runs that copy, including after a failed operation is fixed in place.
+Deploy worker servers first, or use a dedicated queue, when that matters.
+
 ## Documentation
 
 - **[Getting Started](DOCS.md#doc-docs-readme)** - Installation, configuration, and first operation

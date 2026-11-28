@@ -121,6 +121,42 @@ test('excludes operations that already have a pending record', function (): void
     // Assert
     expect($result)->toBe([]);
 })->group('regression');
+
+test('offers an operation again after its record failed', function (): void {
+    createOperationFile('2024_01_15_120000_CreateUsersTable.php', $this->testPath);
+
+    Operation::query()->create([
+        'name' => '2024_01_15_120000_CreateUsersTable',
+        'type' => 'async',
+        'executed_at' => now()->subMinute(),
+        'failed_at' => now(),
+        'state' => OperationState::Failed,
+    ]);
+
+    expect(array_column($this->discovery->getPending(), 'name'))
+        ->toBe(['2024_01_15_120000_CreateUsersTable']);
+})->group('regression');
+
+test('excludes a failed operation that has a newer pending record', function (): void {
+    createOperationFile('2024_01_15_120000_CreateUsersTable.php', $this->testPath);
+
+    Operation::query()->create([
+        'name' => '2024_01_15_120000_CreateUsersTable',
+        'type' => 'async',
+        'executed_at' => now()->subMinute(),
+        'failed_at' => now()->subMinute(),
+        'state' => OperationState::Failed,
+    ]);
+    Operation::query()->create([
+        'name' => '2024_01_15_120000_CreateUsersTable',
+        'type' => 'async',
+        'executed_at' => now(),
+        'state' => OperationState::Pending,
+    ]);
+
+    expect($this->discovery->getPending())->toBe([]);
+})->group('regression');
+
 test('parses operation filenames correctly', function (): void {
     // Arrange
     createOperationFile('2024_01_15_120000_CreateUsersTable.php', $this->testPath);
