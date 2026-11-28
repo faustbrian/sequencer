@@ -45,7 +45,7 @@ describe('WaveExecutionFailedException', function (): void {
             $exception = WaveExecutionFailedException::forWave(1, 5);
 
             // Act & Assert
-            expect(fn () => throw $exception)
+            expect(fn (): never => throw $exception)
                 ->toThrow(WaveExecutionFailedException::class);
         });
     });
@@ -162,13 +162,13 @@ describe('WaveExecutionFailedException', function (): void {
     describe('Sad Path - Exception Handling', function (): void {
         test('exception can be caught with RuntimeException type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw WaveExecutionFailedException::forWave(1, 5))
+            expect(fn (): never => throw WaveExecutionFailedException::forWave(1, 5))
                 ->toThrow(RuntimeException::class);
         });
 
         test('exception can be caught with Exception type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw WaveExecutionFailedException::forWave(1, 5))
+            expect(fn (): never => throw WaveExecutionFailedException::forWave(1, 5))
                 ->toThrow(Exception::class);
         });
 

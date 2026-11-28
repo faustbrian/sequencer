@@ -45,7 +45,7 @@ describe('InvalidOperationDataException', function (): void {
             $exception = InvalidOperationDataException::missingClass();
 
             // Act & Assert
-            expect(fn () => throw $exception)
+            expect(fn (): never => throw $exception)
                 ->toThrow(InvalidOperationDataException::class);
         });
     });
@@ -112,13 +112,13 @@ describe('InvalidOperationDataException', function (): void {
     describe('Sad Path - Exception Handling', function (): void {
         test('exception can be caught with LogicException type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw InvalidOperationDataException::missingClass())
+            expect(fn (): never => throw InvalidOperationDataException::missingClass())
                 ->toThrow(LogicException::class);
         });
 
         test('exception can be caught with Exception type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw InvalidOperationDataException::missingClass())
+            expect(fn (): never => throw InvalidOperationDataException::missingClass())
                 ->toThrow(Exception::class);
         });
 

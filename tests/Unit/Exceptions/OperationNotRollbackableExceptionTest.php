@@ -45,7 +45,7 @@ describe('OperationNotRollbackableException', function (): void {
             $exception = OperationNotRollbackableException::doesNotImplementInterface();
 
             // Act & Assert
-            expect(fn () => throw $exception)
+            expect(fn (): never => throw $exception)
                 ->toThrow(OperationNotRollbackableException::class);
         });
     });
@@ -112,13 +112,13 @@ describe('OperationNotRollbackableException', function (): void {
     describe('Sad Path - Exception Handling', function (): void {
         test('exception can be caught with RuntimeException type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw OperationNotRollbackableException::doesNotImplementInterface())
+            expect(fn (): never => throw OperationNotRollbackableException::doesNotImplementInterface())
                 ->toThrow(RuntimeException::class);
         });
 
         test('exception can be caught with Exception type', function (): void {
             // Arrange & Act & Assert
-            expect(fn () => throw OperationNotRollbackableException::doesNotImplementInterface())
+            expect(fn (): never => throw OperationNotRollbackableException::doesNotImplementInterface())
                 ->toThrow(Exception::class);
         });
 
