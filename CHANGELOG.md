@@ -27,9 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`SEQUENCER_UNRESOLVED_OPERATION_RETRY_DELAY`,
   `SEQUENCER_UNRESOLVED_OPERATION_MAX_RETRIES`, both default 60).
 - `OperationNotFoundException::forUnresolvedPath()`, thrown when a queued
-  operation file does not resolve. The `ExecuteOperation` constructor, and
-  `handle()` outside a queue worker, now throw it instead of the `ErrorException`
-  that `require` raised for a missing file.
+  operation file does not resolve.
+
+### Changed
+- The `ExecuteOperation` constructor, and `handle()` outside a queue worker, now
+  throw `OperationNotFoundException` instead of the `ErrorException` that
+  `require` raised for a missing operation file.
 
 ## [3.3.0] - 2026-10-24
 

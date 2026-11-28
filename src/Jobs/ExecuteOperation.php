@@ -153,8 +153,10 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
     /**
      * Unique key of a ShouldBeUnique operation, captured at dispatch.
      *
-     * Lets a worker without the operation file release the same unique lock
-     * the dispatcher acquired. Null for other operations and old payloads.
+     * Lets a worker without the operation file release the lock under the key
+     * the dispatcher used. Without the file the operation's own uniqueVia()
+     * store is unknown, so that release uses the default cache store. Null for
+     * other operations and old payloads.
      */
     private ?string $uniqueKey = null;
 

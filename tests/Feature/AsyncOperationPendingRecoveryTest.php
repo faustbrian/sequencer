@@ -119,7 +119,9 @@ PHP);
                 ->and(DB::table('jobs')->value('available_at'))->toBeGreaterThanOrEqual($before + 60);
         })->group('regression', 'queue');
 
-        test('requeues on the queue the job came from after the configured delay', function (): void {
+        test('requeues on the connection and queue the job came from after the configured delay', function (): void {
+            // The default connection differs, so a retry pushed there would run inline instead.
+            Config::set('queue.default', 'sync');
             Config::set('sequencer.queue.unresolved_operation.retry_delay', 5);
             $path = writeAsyncOperation($this->tempDir, '2026_01_01_000022_own_queue', $this->marker);
 
@@ -611,6 +613,7 @@ PHP);
                 ->dispatch();
             File::move($path, $this->otherReleaseDir.'/2026_01_01_000020_batched.php');
 
+            $before = now()->getTimestamp();
             workOnce();
 
             $batch = $batch->fresh();
@@ -618,7 +621,8 @@ PHP);
                 ->and($batch->pendingJobs)->toBe(1)
                 ->and($batch->failedJobs)->toBe(0)
                 ->and(queuedJobCount())->toBe(1)
-                ->and(DB::table('jobs')->value('attempts'))->toBe(1);
+                ->and(DB::table('jobs')->value('attempts'))->toBe(1)
+                ->and(DB::table('jobs')->value('available_at'))->toBeGreaterThanOrEqual($before + 60);
         })->group('regression', 'queue');
     });
 
@@ -641,6 +645,17 @@ PHP);
             resolve(SequentialOrchestrator::class)->process();
 
             expect(queuedJobCount())->toBe(1);
+        })->group('regression', 'queue');
+
+        test('rethrows the push failure when marking the record also fails', function (): void {
+            Config::set('sequencer.queue.connection', 'not-configured');
+            writeAsyncOperation($this->tempDir, '2026_01_01_000027_marking_fails', $this->marker);
+            Event::listen('eloquent.updating: '.OperationModel::class, function (): void {
+                throw new LogicException('database down');
+            });
+
+            expect(fn () => resolve(SequentialOrchestrator::class)->process())
+                ->toThrow(InvalidArgumentException::class);
         })->group('regression', 'queue');
 
         test('records a failing operation once on a sync queue', function (): void {
