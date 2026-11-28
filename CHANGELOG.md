@@ -23,8 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   queue, so a worker that has deployed the file runs it, and fails the job after
   a bounded number of retries. The retry carries the rest of a job chain, so
   chained operations still run in order. Batched jobs are released instead.
-  Workers must run this version before an operation that relies on this is
-  queued: an older worker still fails on the missing file.
 
 ### Added
 - `sequencer.queue.unresolved_operation.retry_delay` and `max_retries`
@@ -41,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `RectorConfigBuilder::withSetProviders()` that `cline/coding-standard` 2.x
   still calls, and test closures carry the arrow-function return types that
   Rector 2.8 adds.
+
+### Migration
+- Deploy worker servers before web servers, or use a dedicated queue, before
+  relying on the deferral: a worker still on 3.3.0 fails on a missing operation
+  file and leaves its record pending.
 
 ## [3.3.0] - 2026-10-24
 
