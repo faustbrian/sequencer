@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-11-28
+
 ### Fixed
 - Queued operations no longer stay pending forever when the queue gives up on
   their job, which made every later run skip them. `ExecuteOperation::failed()`
