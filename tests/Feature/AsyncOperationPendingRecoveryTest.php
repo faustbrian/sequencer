@@ -481,7 +481,7 @@ PHP, $this->marker));
                 'state' => OperationState::Pending,
             ]);
 
-            new ExecuteOperation($path, $record->id)->failed(null);
+            new ExecuteOperation($path, $record->id)->failed();
 
             expect($record->fresh()->state)->toBe(OperationState::Failed)
                 ->and(OperationError::query()->count())->toBe(0);

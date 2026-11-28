@@ -59,6 +59,7 @@ use function mb_substr;
 use function preg_match;
 use function sprintf;
 use function str_starts_with;
+use function throw_if;
 
 /**
  * Queue job for executing operations asynchronously.
@@ -446,6 +447,7 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
         $record = $connection->transaction(function (): ?OperationModel {
             $query = OperationModel::query()->whereKey($this->recordId);
             $query->lockForUpdate();
+
             $record = $query->first();
 
             if (!$record instanceof OperationModel || $record->state !== OperationState::Pending) {
@@ -483,9 +485,7 @@ final class ExecuteOperation implements LaravelShouldBeEncrypted, LaravelShouldB
     {
         $exception = OperationNotFoundException::forUnresolvedPath($this->operationPath);
 
-        if ($this->job === null) {
-            throw $exception;
-        }
+        throw_if($this->job === null, $exception);
 
         $retries = $this->batchId === null
             ? $this->unresolvedRetries
